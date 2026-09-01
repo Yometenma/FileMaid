@@ -43,4 +43,22 @@ class RegexMediaNameParserTest {
         assertEquals("Example Movie", parsed.title());
         assertEquals(2024, parsed.year());
     }
+
+    @Test
+    void parsesEpisodeRange() {
+        var parsed = parser.parse("The.Show.S01E02-E05.1080p.mkv");
+        assertEquals(MediaType.EPISODE, parsed.type());
+        assertEquals("The Show", parsed.title());
+        assertEquals(1, parsed.season());
+        assertEquals(List.of(2, 3, 4, 5), parsed.episodes());
+    }
+
+    @Test
+    void parsesSeasonEpisodeWordsWithRange() {
+        var parsed = parser.parse("The Show - Season 1 Episode 2-3.mkv");
+        assertEquals(MediaType.EPISODE, parsed.type());
+        assertEquals("The Show", parsed.title());
+        assertEquals(1, parsed.season());
+        assertEquals(List.of(2, 3), parsed.episodes());
+    }
 }

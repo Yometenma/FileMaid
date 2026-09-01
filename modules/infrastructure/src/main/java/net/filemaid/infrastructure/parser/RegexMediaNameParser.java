@@ -10,13 +10,13 @@ import net.filemaid.core.model.MediaType;
 import net.filemaid.core.model.ParsedMediaName;
 
 /**
- * Self-contained media-name parser. Recognizes {@code S01E02}, {@code 1x02} and
- * {@code Season 1 Episode 2} episode forms plus a movie year, and strips release
- * tags / bracketed group info from titles. No legacy-engine dependency.
+ * Self-contained media-name parser. Recognizes {@code S01E02}, {@code S01E02-E03},
+ * {@code 1x02} and {@code Season 1 Episode 2-3} episode forms plus a movie year,
+ * and strips release tags / bracketed group info from titles.
  */
 public final class RegexMediaNameParser implements MediaNameParser {
-    private static final Pattern SEASON_EPISODE_WORDS = Pattern.compile("(?i)(?:^|[ ._-])(?:Season|Series)[ ._-]?(\\d{1,2})[ ._-]+(?:Episode|Ep|E)[ ._-]?(\\d{1,3}(?:[ ._-]*[Ee]\\d{1,3})*)");
-    private static final Pattern EPISODE = Pattern.compile("(?i)(?:^|[ ._-])S(\\d{1,2})[ ._-]*E(\\d{1,3}(?:[ ._-]*E\\d{1,3})*)");
+    private static final Pattern SEASON_EPISODE_WORDS = Pattern.compile("(?i)(?:^|[ ._-])(?:Season|Series)[ ._-]?(\\d{1,2})[ ._-]+(?:Episode|Ep|E)[ ._-]?(\\d{1,3}(?:[ ._-]*(?:[Ee]\\d{1,3}|-\\d{1,3}))*)");
+    private static final Pattern EPISODE = Pattern.compile("(?i)(?:^|[ ._-])S(\\d{1,2})[ ._-]*E(\\d{1,3}(?:[ ._-]*(?:E\\d{1,3}|-\\d{1,3}))*)");
     private static final Pattern X_EPISODE = Pattern.compile("(?i)(?:^|[ ._-])(\\d{1,2})x(\\d{1,3})");
     private static final Pattern YEAR = Pattern.compile("(?:^|\\D)((?:19|20)\\d{2})(?:\\D|$)");
     private static final Pattern RELEASE_TAGS = Pattern.compile("(?i)\\b(?:2160p|1080p|720p|480p|4k|uhd|bluray|blu-ray|web[- .]?dl|webrip|hdtv|x26[45]|hevc|av1|remux|proper|repack|10bit|hdr|dovi|dv|aac|dts|truehd|atmos)\\b.*$");
@@ -60,6 +60,16 @@ public final class RegexMediaNameParser implements MediaNameParser {
     }
 
     private List<Integer> parseEpisodes(String value) {
+        Matcher range = Pattern.compile("(?i)(?:E)?(\\d{1,3})\\s*-\\s*(?:E)?(\\d{1,3})").matcher(value);
+        if (range.find()) {
+            int start = Integer.parseInt(range.group(1));
+            int end = Integer.parseInt(range.group(2));
+            if (start > 0 && end >= start && end - start <= 40) {
+                List<Integer> episodes = new ArrayList<>();
+                for (int i = start; i <= end; i++) episodes.add(i);
+                return episodes;
+            }
+        }
         Matcher matcher = Pattern.compile("(?i)E?(\\d{1,3})").matcher(value);
         List<Integer> episodes = new ArrayList<>();
         while (matcher.find()) episodes.add(Integer.parseInt(matcher.group(1)));
@@ -80,7 +90,7 @@ public final class RegexMediaNameParser implements MediaNameParser {
     private String cleanTitle(String value) {
         String cleaned = RELEASE_TAGS.matcher(value).replaceFirst("");
         cleaned = BRACKETS.matcher(cleaned).replaceAll(" ");
-        cleaned = cleaned.replaceAll("^[\\[({]+|[\\])}]+$", "").replaceAll("[._]+", " ").replaceAll("\\s+-\\s+", " ").replaceAll("\\s+", " ").trim();
+        cleaned = cleaned.replaceAll("^[\\[({]+|[\\])}]+$", "").replaceAll("[._]+", " ").replaceAll("\\s+-\\s+", " ").replaceAll("\\s+", " ").replaceAll("[\\s._-]+$", "").trim();
         return cleaned.isEmpty() ? "Unknown" : cleaned;
     }
 }

@@ -1,15 +1,18 @@
 package net.filemaid.infrastructure.metadata;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import net.filemaid.application.port.SimilarityRanker;
 import net.filemaid.core.model.MetadataCandidate;
 import net.filemaid.core.model.RankedCandidate;
 
 /**
- * Ranks candidates by title similarity using a built-in normalized Levenshtein
- * distance, plus a small bonus for a matching year. Pure local computation.
+ * Ranks candidates by title similarity. Combines a q-gram (3-gram) Dice
+ * coefficient with a normalized Levenshtein distance, taking the better of the
+ * two, plus a small bonus for a matching year. Pure local computation.
  */
 public final class BuiltinSimilarityRanker implements SimilarityRanker {
     @Override
@@ -34,9 +37,34 @@ public final class BuiltinSimilarityRanker implements SimilarityRanker {
         if (x.isEmpty() || y.isEmpty()) return 0f;
         if (x.equals(y)) return 1f;
         if (x.contains(y) || y.contains(x)) return 0.8f;
-        int distance = levenshtein(x, y);
-        int max = Math.max(x.length(), y.length());
-        return Math.max(0f, 1f - (float) distance / max);
+        return Math.max(levenshteinScore(x, y), qGramScore(x, y));
+    }
+
+    private static float levenshteinScore(String a, String b) {
+        int max = Math.max(a.length(), b.length());
+        return max == 0 ? 0f : Math.max(0f, 1f - (float) levenshtein(a, b) / max);
+    }
+
+    private static float qGramScore(String a, String b) {
+        Map<String, Integer> gramsA = nGrams(a);
+        Map<String, Integer> gramsB = nGrams(b);
+        int intersection = 0;
+        for (var entry : gramsA.entrySet()) {
+            intersection += Math.min(entry.getValue(), gramsB.getOrDefault(entry.getKey(), 0));
+        }
+        int totalA = gramsA.values().stream().mapToInt(Integer::intValue).sum();
+        int totalB = gramsB.values().stream().mapToInt(Integer::intValue).sum();
+        int total = totalA + totalB;
+        return total == 0 ? 0f : 2.0f * intersection / total;
+    }
+
+    private static Map<String, Integer> nGrams(String value) {
+        String padded = "  " + value + "  ";
+        Map<String, Integer> grams = new HashMap<>();
+        for (int i = 0; i + 3 <= padded.length(); i++) {
+            grams.merge(padded.substring(i, i + 3), 1, Integer::sum);
+        }
+        return grams;
     }
 
     private static String normalize(String value) {

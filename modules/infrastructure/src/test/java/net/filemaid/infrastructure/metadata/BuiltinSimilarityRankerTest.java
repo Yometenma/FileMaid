@@ -43,6 +43,13 @@ class BuiltinSimilarityRankerTest {
         assertEquals("right", ranked.get(0).candidate().id());
     }
 
+    @Test
+    void similarityHandlesMinorTypos() {
+        float typo = BuiltinSimilarityRanker.similarity("Example Show", "Exampl Show");
+        float unrelated = BuiltinSimilarityRanker.similarity("Example Show", "Something Else");
+        assertTrue(typo > unrelated);
+    }
+
     private static MetadataCandidate candidate(String id, String title, int year) {
         return new MetadataCandidate("tmdb", id, MetadataType.MOVIE, title, List.of(), year, null);
     }
