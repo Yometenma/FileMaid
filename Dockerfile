@@ -7,13 +7,14 @@ RUN npm run build
 
 FROM gradle:8.10.2-jdk17 AS build
 WORKDIR /workspace
+ARG PROXY_URL=
 COPY settings.gradle build.gradle ./
 COPY modules/core modules/core
 COPY modules/application modules/application
 COPY modules/infrastructure modules/infrastructure
 COPY modules/server modules/server
 COPY --from=web-build /workspace/modules/server/src/main/resources/static modules/server/src/main/resources/static
-RUN gradle :modules:server:bootJar --no-daemon --console=plain
+RUN if [ -n "$PROXY_URL" ]; then export HTTP_PROXY=$PROXY_URL HTTPS_PROXY=$PROXY_URL; fi && gradle :modules:server:bootJar --no-daemon --console=plain
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app

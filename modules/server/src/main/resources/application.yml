@@ -23,7 +23,9 @@ filemaid:
   roots:
     - id: media
       path: ${FILEMAID_MEDIA_ROOT:./data/media}
-      writable: false
+      # 注意：用独立占位符而非 FILEMAID_ROOTS_0_WRITABLE——索引式环境变量
+      # 会整体覆盖 YAML 列表项，导致 id/path 丢失（Storage root id must not be blank）
+      writable: ${FILEMAID_ROOT_WRITABLE:false}
   scan:
     max-depth: ${FILEMAID_SCAN_MAX_DEPTH:16}
     max-files: ${FILEMAID_SCAN_MAX_FILES:10000}
