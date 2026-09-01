@@ -55,6 +55,7 @@ public final class ExecuteRenamePlanService {
                 case MOVE -> Files.move(source, target);
                 case COPY -> Files.copy(source, target);
                 case HARDLINK -> Files.createLink(target, source);
+                case NFO, ARTWORK -> throw new IllegalArgumentException("后处理操作必须通过后处理服务执行");
             }
             return new OperationResult(sourceText, targetText, operation.type(), true, null);
         } catch (Exception failure) {

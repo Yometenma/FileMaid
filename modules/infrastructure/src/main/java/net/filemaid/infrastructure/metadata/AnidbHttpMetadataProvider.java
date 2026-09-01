@@ -28,14 +28,22 @@ import net.filemaid.core.model.RankedCandidate;
  * matches locally. Index download is lazy and cached for the process lifetime.
  */
 public final class AnidbHttpMetadataProvider implements MetadataProvider {
-    private static final String INDEX_URL = "https://anidb.net/api/anime-titles.dat.gz";
+    private static final String DEFAULT_INDEX_URL = "https://anidb.net/api/anime-titles.dat.gz";
     private final boolean enabled;
     private final HttpClient client;
+    private final String indexUrl;
+    private final Duration timeout;
     private volatile List<MetadataCandidate> cachedIndex;
 
     public AnidbHttpMetadataProvider(boolean enabled) {
+        this(enabled, null, null, null);
+    }
+
+    public AnidbHttpMetadataProvider(boolean enabled, String endpoint, HttpClient client, Duration timeout) {
         this.enabled = enabled;
-        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.indexUrl = endpoint == null || endpoint.isBlank() ? DEFAULT_INDEX_URL : endpoint;
+        this.client = client == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : client;
+        this.timeout = timeout == null ? Duration.ofSeconds(120) : timeout;
     }
 
     @Override public String id() { return "anidb"; }
@@ -70,8 +78,8 @@ public final class AnidbHttpMetadataProvider implements MetadataProvider {
 
     private synchronized List<MetadataCandidate> loadIndex() throws Exception {
         if (cachedIndex != null) return cachedIndex;
-        HttpRequest request = HttpRequest.newBuilder(URI.create(INDEX_URL))
-                .timeout(Duration.ofSeconds(120))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(indexUrl))
+                .timeout(timeout)
                 .GET().build();
         HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {

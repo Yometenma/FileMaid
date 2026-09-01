@@ -8,6 +8,9 @@ services:
     environment:
       FILEMAID_MEDIA_ROOT: /media
       FILEMAID_DB_PATH: /config/filemaid.db
+      FILEMAID_AUTH_ENABLED: ${FILEMAID_AUTH_ENABLED:-true}
+      FILEMAID_SECURE_COOKIES: ${FILEMAID_SECURE_COOKIES:-false}
+      FILEMAID_ROOTS_0_WRITABLE: ${FILEMAID_ROOTS_0_WRITABLE:-false}
       FILEMAID_SCAN_MAX_DEPTH: 16
       FILEMAID_SCAN_MAX_FILES: 10000
       FILEMAID_TMDB_API_KEY: ${FILEMAID_TMDB_API_KEY:-}
@@ -26,3 +29,9 @@ services:
       # 媒体目录默认只读；要启用写操作（重命名/移动/复制/硬链接），
       # 把 :ro 改为 :rw，并在启动参数里设 filemaid.roots[0].writable=true
       - ./data/media:/media:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

@@ -43,7 +43,7 @@ public final class UndoService {
                     if (Files.exists(source)) return failure(record, "源路径已存在（不覆盖），无法撤销");
                     Files.move(target, source);
                 }
-                case COPY, HARDLINK -> Files.delete(target);
+                case COPY, HARDLINK, NFO, ARTWORK -> Files.delete(target);
             }
             return new OperationResult(record.target(), record.source(), record.type(), true, null);
         } catch (Exception failure) {

@@ -20,11 +20,19 @@ import net.filemaid.core.model.MetadataType;
 public final class TvMazeHttpMetadataProvider implements MetadataProvider {
     private final boolean enabled;
     private final HttpClient client;
+    private final String endpoint;
+    private final Duration timeout;
     private final ObjectMapper json = new ObjectMapper();
 
     public TvMazeHttpMetadataProvider(boolean enabled) {
+        this(enabled, null, null, null);
+    }
+
+    public TvMazeHttpMetadataProvider(boolean enabled, String endpoint, HttpClient client, Duration timeout) {
         this.enabled = enabled;
-        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.endpoint = endpoint == null || endpoint.isBlank() ? "https://api.tvmaze.com" : endpoint.replaceAll("/+$", "");
+        this.client = client == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : client;
+        this.timeout = timeout == null ? Duration.ofSeconds(20) : timeout;
     }
 
     @Override public String id() { return "tvmaze"; }
@@ -34,8 +42,8 @@ public final class TvMazeHttpMetadataProvider implements MetadataProvider {
     @Override
     public List<MetadataCandidate> search(String query, MetadataType type, Locale locale, int limit) throws Exception {
         if (type == MetadataType.MOVIE) return List.of();
-        String url = "https://api.tvmaze.com/search/shows?q=" + encode(query);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20)).GET().build();
+        String url = endpoint + "/search/shows?q=" + encode(query);
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(timeout).GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IllegalStateException("TVMaze 请求失败（HTTP " + response.statusCode() + "）");
@@ -47,7 +55,7 @@ public final class TvMazeHttpMetadataProvider implements MetadataProvider {
             String title = text(show, "name");
             String premiered = text(show, "premiered");
             Integer year = premiered != null && premiered.length() >= 4 ? parseYear(premiered.substring(0, 4)) : null;
-            values.add(new MetadataCandidate(id(), show.path("id").asText(), type, title, List.of(), year, text(show, "summary")));
+            values.add(new MetadataCandidate(id(), show.path("id").asText(), type, title, List.of(), year, text(show, "summary"), show.path("image").path("original").asText(null)));
         }
         return values;
     }

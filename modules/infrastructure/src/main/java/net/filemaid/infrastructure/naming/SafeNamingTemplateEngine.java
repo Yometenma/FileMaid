@@ -51,7 +51,7 @@ public final class SafeNamingTemplateEngine implements NamingTemplateEngine {
         return path.toString().replace('\\', '/');
     }
 
-    public Map<String, String> templates() {
+    @Override public Map<String, String> templates() {
         return Map.of("series", seriesTemplate, "movie", movieTemplate, "unknown", unknownTemplate);
     }
 

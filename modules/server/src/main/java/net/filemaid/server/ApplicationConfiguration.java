@@ -9,6 +9,10 @@ import net.filemaid.application.port.NamingTemplateEngine;
 import net.filemaid.application.port.SimilarityRanker;
 import net.filemaid.application.port.MatchDecisionRepository;
 import net.filemaid.application.port.OperationHistoryRepository;
+import net.filemaid.application.port.SettingsRepository;
+import net.filemaid.application.port.StorageBrowser;
+import net.filemaid.application.port.MediaPostProcessor;
+import net.filemaid.application.port.UserAccountRepository;
 import net.filemaid.application.service.ParseMediaNameService;
 import net.filemaid.application.service.ProbeMediaInfoService;
 import net.filemaid.application.service.RenamePreviewService;
@@ -23,8 +27,12 @@ import net.filemaid.application.service.MatchMetadataService;
 import net.filemaid.application.service.OperationHistoryService;
 import net.filemaid.application.service.UndoService;
 import net.filemaid.application.service.ValidateRenamePlanService;
+import net.filemaid.application.service.SettingsService;
+import net.filemaid.application.service.BrowseStorageService;
+import net.filemaid.application.service.PostProcessMediaService;
 import net.filemaid.core.model.StorageRoot;
 import net.filemaid.infrastructure.filesystem.LocalMediaScanner;
+import net.filemaid.infrastructure.filesystem.LocalStorageBrowser;
 import net.filemaid.infrastructure.mediainfo.FfprobeMediaInfoProvider;
 import net.filemaid.infrastructure.parser.RegexMediaNameParser;
 import net.filemaid.infrastructure.metadata.AnidbHttpMetadataProvider;
@@ -36,19 +44,23 @@ import net.filemaid.infrastructure.metadata.TvdbHttpMetadataProvider;
 import net.filemaid.infrastructure.naming.SafeNamingTemplateEngine;
 import net.filemaid.infrastructure.persistence.SqliteMatchDecisionRepository;
 import net.filemaid.infrastructure.persistence.SqliteOperationHistoryRepository;
+import net.filemaid.infrastructure.persistence.SqliteSettingsRepository;
+import net.filemaid.infrastructure.postprocess.LocalMediaPostProcessor;
+import net.filemaid.infrastructure.persistence.SqliteUserAccountRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class ApplicationConfiguration {
     @Bean MediaScanner mediaScanner() { return new LocalMediaScanner(); }
+    @Bean StorageBrowser storageBrowser() { return new LocalStorageBrowser(); }
     @Bean StoragePathPolicy storagePathPolicy() { return new StoragePathPolicy(); }
+    @Bean BrowseStorageService browseStorageService(FileMaidProperties properties, StoragePathPolicy policy, StorageBrowser browser) {
+        return new BrowseStorageService(storageRoots(properties), policy, browser);
+    }
     @Bean MediaNameParser mediaNameParser() { return new RegexMediaNameParser(); }
     @Bean ParseMediaNameService parseMediaNameService(MediaNameParser parser) { return new ParseMediaNameService(parser); }
-    @Bean NamingTemplateEngine namingTemplateEngine(FileMaidProperties properties) {
-        var naming = properties.naming();
-        return new SafeNamingTemplateEngine(naming.series(), naming.movie(), naming.unknown());
-    }
+    @Bean NamingTemplateEngine namingTemplateEngine(FileMaidProperties properties, SettingsService settings) { return new RuntimeNamingTemplateEngine(properties, settings); }
     @Bean RenamePreviewService renamePreviewService(MediaNameParser parser, NamingTemplateEngine naming, ProbeMediaInfoService probeService) { return new RenamePreviewService(parser, naming, probeService); }
     @Bean BuildRenamePlanService buildRenamePlanService(RenamePreviewService previewService) { return new BuildRenamePlanService(previewService); }
     @Bean ValidateRenamePlanService validateRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy) {
@@ -62,7 +74,14 @@ public class ApplicationConfiguration {
     @Bean ExecuteRenamePlanService executeRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy, OperationHistoryRepository history) {
         return new ExecuteRenamePlanService(storageRoots(properties), pathPolicy, history);
     }
-    @Bean SearchMetadataService searchMetadataService(List<MetadataProvider> providers) { return new SearchMetadataService(providers); }
+    @Bean SettingsRepository settingsRepository(FileMaidProperties properties) { return new SqliteSettingsRepository(properties.dbPath()); }
+    @Bean UserAccountRepository userAccountRepository(FileMaidProperties properties) { return new SqliteUserAccountRepository(properties.dbPath()); }
+    @Bean SettingsService settingsService(SettingsRepository repository) { return new SettingsService(repository); }
+    @Bean MediaPostProcessor mediaPostProcessor() { return new LocalMediaPostProcessor(); }
+    @Bean PostProcessMediaService postProcessMediaService(FileMaidProperties properties, StoragePathPolicy policy, MediaPostProcessor processor, OperationHistoryRepository history) {
+        return new PostProcessMediaService(storageRoots(properties), policy, processor, history);
+    }
+    @Bean SearchMetadataService searchMetadataService(List<MetadataProvider> providers, SettingsService settings) { return new SearchMetadataService(providers, settings::languagePriority); }
     @Bean SimilarityRanker similarityRanker() { return new BuiltinSimilarityRanker(); }
     @Bean MatchMetadataService matchMetadataService(MediaNameParser parser, SearchMetadataService searchService, SimilarityRanker ranker) { return new MatchMetadataService(parser, searchService, ranker); }
     @Bean MatchDecisionRepository matchDecisionRepository(FileMaidProperties properties) { return new SqliteMatchDecisionRepository(properties.dbPath()); }
@@ -76,11 +95,11 @@ public class ApplicationConfiguration {
         return new ScanMediaService(storageRoots(properties), scanner, pathPolicy);
     }
 
-    @Bean MetadataProvider tmdbMetadataProvider(FileMaidProperties properties) { return new TmdbHttpMetadataProvider(properties.metadata().tmdbApiKey()); }
-    @Bean MetadataProvider tvdbMetadataProvider(FileMaidProperties properties) { return new TvdbHttpMetadataProvider(properties.metadata().tvdbApiKey(), properties.metadata().tvdbPin()); }
-    @Bean MetadataProvider omdbMetadataProvider(FileMaidProperties properties) { return new OmdbHttpMetadataProvider(properties.metadata().omdbApiKey()); }
-    @Bean MetadataProvider tvmazeMetadataProvider(FileMaidProperties properties) { return new TvMazeHttpMetadataProvider(properties.metadata().tvmazeEnabled()); }
-    @Bean MetadataProvider anidbMetadataProvider(FileMaidProperties properties) { return new AnidbHttpMetadataProvider(properties.metadata().anidbEnabled()); }
+    @Bean MetadataProvider tmdbMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("tmdb", properties, settings); }
+    @Bean MetadataProvider tvdbMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("tvdb", properties, settings); }
+    @Bean MetadataProvider omdbMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("omdb", properties, settings); }
+    @Bean MetadataProvider tvmazeMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("tvmaze", properties, settings); }
+    @Bean MetadataProvider anidbMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("anidb", properties, settings); }
 
     private List<StorageRoot> storageRoots(FileMaidProperties properties) {
         return properties.roots().stream()

@@ -20,11 +20,19 @@ import net.filemaid.core.model.MetadataType;
 public final class OmdbHttpMetadataProvider implements MetadataProvider {
     private final String apiKey;
     private final HttpClient client;
+    private final String endpoint;
+    private final Duration timeout;
     private final ObjectMapper json = new ObjectMapper();
 
     public OmdbHttpMetadataProvider(String apiKey) {
+        this(apiKey, null, null, null);
+    }
+
+    public OmdbHttpMetadataProvider(String apiKey, String endpoint, HttpClient client, Duration timeout) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.endpoint = endpoint == null || endpoint.isBlank() ? "https://www.omdbapi.com/" : endpoint;
+        this.client = client == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : client;
+        this.timeout = timeout == null ? Duration.ofSeconds(20) : timeout;
     }
 
     @Override public String id() { return "omdb"; }
@@ -34,8 +42,8 @@ public final class OmdbHttpMetadataProvider implements MetadataProvider {
     @Override
     public List<MetadataCandidate> search(String query, MetadataType type, Locale locale, int limit) throws Exception {
         String typeParam = type == MetadataType.MOVIE ? "movie" : "series";
-        String url = "https://www.omdbapi.com/?apikey=" + encode(apiKey) + "&s=" + encode(query) + "&type=" + typeParam;
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20)).GET().build();
+        String url = endpoint + (endpoint.contains("?") ? "&" : "?") + "apikey=" + encode(apiKey) + "&s=" + encode(query) + "&type=" + typeParam;
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(timeout).GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IllegalStateException("OMDb 请求失败（HTTP " + response.statusCode() + "）");
@@ -48,7 +56,8 @@ public final class OmdbHttpMetadataProvider implements MetadataProvider {
                 String title = text(item, "Title");
                 String yearStr = text(item, "Year");
                 Integer year = yearStr != null && yearStr.length() >= 4 ? parseYear(yearStr.substring(0, 4)) : null;
-                values.add(new MetadataCandidate(id(), text(item, "imdbID"), type, title, List.of(), year, null));
+                String poster=text(item,"Poster");
+                values.add(new MetadataCandidate(id(), text(item, "imdbID"), type, title, List.of(), year, null, poster != null && poster.startsWith("https://") ? poster : null));
             }
         }
         return values;

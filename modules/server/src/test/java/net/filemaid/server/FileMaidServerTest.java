@@ -3,6 +3,7 @@ package net.filemaid.server;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -25,6 +26,7 @@ import org.springframework.http.MediaType;
         "filemaid.metadata.tvmaze-enabled=false",
         "filemaid.metadata.anidb-enabled=false",
         "filemaid.db-path=build/test.db"
+        ,"filemaid.auth.enabled=false"
 })
 @AutoConfigureMockMvc
 class FileMaidServerTest {
@@ -50,6 +52,16 @@ class FileMaidServerTest {
     }
 
     @Test
+    void reportsSelfHostedDiagnosticsWithoutExposingAbsolutePaths() throws Exception {
+        mvc.perform(get("/api/v1/system/diagnostics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.databaseWritable").isBoolean())
+                .andExpect(jsonPath("$.ffprobeAvailable").isBoolean())
+                .andExpect(jsonPath("$.roots[0].id").value("root:media"))
+                .andExpect(jsonPath("$.roots[0].detail").exists());
+    }
+
+    @Test
     void reportsMetadataProviderAsUnavailableWithoutSecret() throws Exception {
         mvc.perform(get("/api/v1/metadata/providers"))
                 .andExpect(status().isOk())
@@ -66,6 +78,20 @@ class FileMaidServerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].path").value("Example.S01E01.mkv"))
                 .andExpect(jsonPath("$[0].kind").value("VIDEO"));
+    }
+
+    @Test
+    void browsesOnlyDirectoriesInsideConfiguredRoot() throws Exception {
+        Files.createDirectories(mediaDirectory.resolve("shows/Example"));
+        mvc.perform(get("/api/v1/roots/media/directories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.current").value(""))
+                .andExpect(jsonPath("$.entries[0].name").value("shows"))
+                .andExpect(jsonPath("$.entries[0].path").value("shows"));
+        mvc.perform(get("/api/v1/roots/media/directories").param("path", "../"))
+                .andExpect(status().isBadRequest());
+        Files.deleteIfExists(mediaDirectory.resolve("shows/Example"));
+        Files.deleteIfExists(mediaDirectory.resolve("shows"));
     }
 
     @Test
@@ -119,5 +145,44 @@ class FileMaidServerTest {
                 .andExpect(jsonPath("$[0].type").value("SERIES"))
                 .andExpect(jsonPath("$[0].members.length()").value(2))
                 .andExpect(jsonPath("$[0].members[1].companionOf").value("show/Example.Show.S01E01.mkv"));
+    }
+
+    @Test
+    void persistsSettingsAndMasksProxyPassword() throws Exception {
+        mvc.perform(put("/api/v1/settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"metadata.languagePriority":"ja,en", "network.proxyPassword":"secret"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['metadata.languagePriority']").value("ja,en"))
+                .andExpect(jsonPath("$['network.proxyPassword']").value("********"));
+
+        mvc.perform(get("/api/v1/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['metadata.languagePriority']").value("ja,en"))
+                .andExpect(jsonPath("$['network.proxyPassword']").value("********"));
+    }
+
+    @Test
+    void exposesCompleteSettingsCatalogueAndRejectsInvalidValues() throws Exception {
+        mvc.perform(get("/api/v1/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['naming.preset']").value("JELLYFIN"))
+                .andExpect(jsonPath("$['postprocess.generateNfo']").value("false"))
+                .andExpect(jsonPath("$['files.defaultOperation']").value("MOVE"))
+                .andExpect(jsonPath("$['scan.maxDepth']").value("16"))
+                .andExpect(jsonPath("$['system.timezone']").value("Asia/Shanghai"));
+
+        mvc.perform(get("/api/v1/settings/schema"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].key").exists())
+                .andExpect(jsonPath("$[0].category").exists());
+
+        mvc.perform(put("/api/v1/settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"scan.maxDepth\":\"0\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").exists());
     }
 }

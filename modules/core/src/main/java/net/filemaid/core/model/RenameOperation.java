@@ -10,5 +10,5 @@ public record RenameOperation(Path source, Path target, OperationType type) {
         Objects.requireNonNull(type, "type");
     }
 
-    public enum OperationType { MOVE, COPY, HARDLINK }
+    public enum OperationType { MOVE, COPY, HARDLINK, NFO, ARTWORK }
 }

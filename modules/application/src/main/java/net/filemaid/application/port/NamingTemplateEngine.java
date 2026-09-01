@@ -10,4 +10,6 @@ public interface NamingTemplateEngine {
     default String format(ParsedMediaName media, MediaInfo mediaInfo) {
         return format(media);
     }
+
+    default java.util.Map<String, String> templates() { return java.util.Map.of(); }
 }

@@ -7,4 +7,10 @@ tools/
 data/
 config/
 .env
+web/node_modules/
+web/*.tsbuildinfo
+web/src/*.js
+web/src/*.d.ts
+web/vite.config.js
+web/vite.config.d.ts
 AGENTS.md

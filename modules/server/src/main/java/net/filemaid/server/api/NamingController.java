@@ -2,7 +2,6 @@ package net.filemaid.server.api;
 
 import java.util.Map;
 import net.filemaid.application.port.NamingTemplateEngine;
-import net.filemaid.infrastructure.naming.SafeNamingTemplateEngine;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,6 +14,6 @@ public class NamingController {
 
     @GetMapping("/templates")
     Map<String, String> templates() {
-        return engine instanceof SafeNamingTemplateEngine safe ? safe.templates() : Map.of();
+        return engine.templates();
     }
 }

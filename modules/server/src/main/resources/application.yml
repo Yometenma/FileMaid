@@ -4,6 +4,13 @@ spring:
 
 server:
   port: ${FILEMAID_PORT:8080}
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${FILEMAID_SECURE_COOKIES:false}
 
 management:
   endpoints:
@@ -33,3 +40,5 @@ filemaid:
     unknown: ${FILEMAID_NAMING_UNKNOWN:}
   probe:
     ffprobe-path: ${FILEMAID_FFPROBE_PATH:ffprobe}
+  auth:
+    enabled: ${FILEMAID_AUTH_ENABLED:true}

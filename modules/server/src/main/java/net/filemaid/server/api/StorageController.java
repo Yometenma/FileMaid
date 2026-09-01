@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.util.List;
 import net.filemaid.application.service.ProbeMediaInfoService;
 import net.filemaid.application.service.ScanMediaService;
+import net.filemaid.application.service.BrowseStorageService;
+import net.filemaid.application.service.SettingsService;
 import net.filemaid.core.model.MediaFile;
 import net.filemaid.core.model.MediaInfo;
 import net.filemaid.server.FileMaidProperties;
@@ -20,11 +22,23 @@ public class StorageController {
     private final ScanMediaService scanService;
     private final ProbeMediaInfoService probeService;
     private final FileMaidProperties properties;
+    private final BrowseStorageService browseService;
+    private final SettingsService settings;
 
-    public StorageController(ScanMediaService scanService, ProbeMediaInfoService probeService, FileMaidProperties properties) {
+    public StorageController(ScanMediaService scanService, ProbeMediaInfoService probeService, FileMaidProperties properties, BrowseStorageService browseService, SettingsService settings) {
         this.scanService = scanService;
         this.probeService = probeService;
         this.properties = properties;
+        this.browseService = browseService;
+        this.settings = settings;
+    }
+
+    @GetMapping("/{rootId}/directories")
+    BrowseStorageService.DirectoryListing directories(@PathVariable String rootId,
+            @RequestParam(defaultValue = "") String path,
+            @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "100") int limit) throws IOException {
+        return browseService.browse(rootId, path, query, limit);
     }
 
     @GetMapping
@@ -34,9 +48,16 @@ public class StorageController {
 
     @GetMapping("/{rootId}/scan")
     List<MediaFileResponse> scan(@PathVariable String rootId, @RequestParam(defaultValue = "") String path) throws IOException {
-        return scanService.scan(rootId, path, properties.scan().maxDepth(), properties.scan().maxFiles()).stream()
+        int maxDepth = integer("scan.maxDepth", properties.scan().maxDepth());
+        int maxFiles = integer("scan.maxFiles", properties.scan().maxFiles());
+        return scanService.scan(rootId, path, maxDepth, maxFiles).stream()
                 .map(MediaFileResponse::from)
                 .toList();
+    }
+
+    private int integer(String key, int fallback) {
+        try { return Integer.parseInt(settings.value(key, Integer.toString(fallback))); }
+        catch (NumberFormatException ignored) { return fallback; }
     }
 
     @GetMapping("/{rootId}/probe")

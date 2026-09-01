@@ -1,59 +1,12 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FileMaid · 媒体整理预览</title>
-  <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand"><span class="mark">FM</span><span>FileMaid</span></div>
-    <div class="status"><span class="dot"></span>只读预览模式</div>
-  </header>
-  <main>
-    <section class="intro">
-      <p class="eyebrow">SELF-HOSTED MEDIA ORGANIZER</p>
-      <h1>先看清楚，再整理。</h1>
-      <p>扫描服务器媒体目录，解析剧集和电影名称，并在不改动文件的前提下生成目标路径。</p>
-    </section>
-
-    <section class="workspace">
-      <div class="controls">
-        <label>媒体根目录<select id="root"></select></label>
-        <label class="grow">相对路径<input id="path" placeholder="例如：downloads/tv，留空扫描根目录"></label>
-        <button id="scan">扫描并预览</button>
-      </div>
-      <div id="message" class="message">等待扫描</div>
-      <div class="summary">
-        <div><strong id="fileCount">0</strong><span>扫描文件</span></div>
-        <div><strong id="episodeCount">0</strong><span>剧集</span></div>
-        <div><strong id="movieCount">0</strong><span>电影</span></div>
-        <div><strong id="warningCount">0</strong><span>待确认</span></div>
-      </div>
-      <div id="groupResults" class="group-strip"><div class="group-empty">扫描后将在这里显示电影、剧集和伴随字幕分组</div></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>源文件</th><th>识别</th><th>目标路径预览</th><th>状态</th></tr></thead>
-          <tbody id="results"><tr class="empty"><td colspan="4">选择目录后开始第一次只读扫描</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="workspace metadata-workspace">
-      <div class="section-heading">
-        <div><p class="eyebrow">METADATA MATCHING</p><h2>搜索 TMDB 候选</h2></div>
-        <span id="providerStatus" class="provider-status">正在检查…</span>
-      </div>
-      <div class="controls">
-        <label>类型<select id="metadataType"><option value="SERIES">剧集</option><option value="MOVIE">电影</option></select></label>
-        <label class="grow">标题<input id="metadataQuery" placeholder="例如：葬送的芙莉莲"></label>
-        <button id="metadataSearch">搜索候选</button>
-      </div>
-      <div id="metadataMessage" class="message">扫描后可点击识别标题自动填入，也可以手动搜索</div>
-      <div id="metadataResults" class="candidate-grid"><div class="candidate-empty">尚未搜索元数据</div></div>
-    </section>
-  </main>
-  <script src="/app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>FileMaid</title>
+    <script type="module" crossorigin src="/assets/index-BwpI7_0K.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Dr-VCUCe.css">
+  </head>
+  <body><div id="app"></div></body>
 </html>

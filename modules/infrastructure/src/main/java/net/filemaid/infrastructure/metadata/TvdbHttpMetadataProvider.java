@@ -26,13 +26,21 @@ public final class TvdbHttpMetadataProvider implements MetadataProvider {
     private final String apiKey;
     private final String pin;
     private final HttpClient client;
+    private final String endpoint;
+    private final Duration timeout;
     private final ObjectMapper json = new ObjectMapper();
     private volatile String token;
 
     public TvdbHttpMetadataProvider(String apiKey, String pin) {
+        this(apiKey, pin, null, null, null);
+    }
+
+    public TvdbHttpMetadataProvider(String apiKey, String pin, String endpoint, HttpClient client, Duration timeout) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.pin = pin == null ? "" : pin.trim();
-        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.endpoint = endpoint == null || endpoint.isBlank() ? "https://api4.thetvdb.com/v4" : endpoint.replaceAll("/+$", "");
+        this.client = client == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : client;
+        this.timeout = timeout == null ? Duration.ofSeconds(20) : timeout;
     }
 
     @Override public String id() { return "tvdb"; }
@@ -42,9 +50,9 @@ public final class TvdbHttpMetadataProvider implements MetadataProvider {
     @Override
     public List<MetadataCandidate> search(String query, MetadataType type, Locale locale, int limit) throws Exception {
         String typeParam = type == MetadataType.MOVIE ? "movie" : "series";
-        String url = "https://api4.thetvdb.com/v4/search?q=" + encode(query) + "&type=" + typeParam;
+        String url = endpoint + "/search?q=" + encode(query) + "&type=" + typeParam;
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(20))
+                .timeout(timeout)
                 .header("Authorization", "Bearer " + authorizationToken())
                 .header("Accept", "application/json")
                 .GET().build();
@@ -58,7 +66,7 @@ public final class TvdbHttpMetadataProvider implements MetadataProvider {
             String title = text(item, "name");
             String firstAired = text(item, "firstAired");
             Integer year = firstAired != null && firstAired.length() >= 4 ? parseYear(firstAired.substring(0, 4)) : null;
-            values.add(new MetadataCandidate(id(), item.path("id").asText(), type, title, List.of(), year, text(item, "overview")));
+            values.add(new MetadataCandidate(id(), item.path("id").asText(), type, title, List.of(), year, text(item, "overview"), text(item,"image_url")));
         }
         return values;
     }
@@ -68,8 +76,8 @@ public final class TvdbHttpMetadataProvider implements MetadataProvider {
         ObjectNode body = json.createObjectNode();
         body.put("apikey", apiKey);
         if (!pin.isBlank()) body.put("pin", pin);
-        HttpRequest request = HttpRequest.newBuilder(URI.create("https://api4.thetvdb.com/v4/login"))
-                .timeout(Duration.ofSeconds(20))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint + "/login"))
+                .timeout(timeout)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)))
                 .build();

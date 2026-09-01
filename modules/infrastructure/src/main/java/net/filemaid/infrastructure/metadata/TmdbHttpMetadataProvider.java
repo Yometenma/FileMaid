@@ -19,11 +19,19 @@ import net.filemaid.core.model.MetadataType;
 public final class TmdbHttpMetadataProvider implements MetadataProvider {
     private final String apiKey;
     private final HttpClient client;
+    private final String endpoint;
+    private final Duration timeout;
     private final ObjectMapper json = new ObjectMapper();
 
     public TmdbHttpMetadataProvider(String apiKey) {
+        this(apiKey, null, null, null);
+    }
+
+    public TmdbHttpMetadataProvider(String apiKey, String endpoint, HttpClient client, Duration timeout) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.endpoint = endpoint == null || endpoint.isBlank() ? "https://api.themoviedb.org/3" : endpoint.replaceAll("/+$", "");
+        this.client = client == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : client;
+        this.timeout = timeout == null ? Duration.ofSeconds(20) : timeout;
     }
 
     @Override public String id() { return "tmdb"; }
@@ -34,9 +42,9 @@ public final class TmdbHttpMetadataProvider implements MetadataProvider {
     public List<MetadataCandidate> search(String query, MetadataType type, Locale locale, int limit) throws Exception {
         String category = type == MetadataType.MOVIE ? "movie" : "tv";
         String language = locale == null ? "zh-CN" : locale.toLanguageTag();
-        String url = "https://api.themoviedb.org/3/search/" + category
+        String url = endpoint + "/search/" + category
                 + "?api_key=" + encode(apiKey) + "&query=" + encode(query) + "&language=" + encode(language);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(20)).GET().build();
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(timeout).GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IllegalStateException("TMDB 请求失败（HTTP " + response.statusCode() + "）");
@@ -49,7 +57,8 @@ public final class TmdbHttpMetadataProvider implements MetadataProvider {
             String date = text(item, type == MetadataType.MOVIE ? "release_date" : "first_air_date");
             Integer year = date != null && date.length() >= 4 ? parseYear(date.substring(0, 4)) : null;
             List<String> aliases = original == null || original.equals(title) ? List.of() : List.of(original);
-            values.add(new MetadataCandidate(id(), item.path("id").asText(), type, title, aliases, year, text(item, "overview")));
+            String poster=text(item,"poster_path");
+            values.add(new MetadataCandidate(id(), item.path("id").asText(), type, title, aliases, year, text(item, "overview"), poster==null?null:"https://image.tmdb.org/t/p/w500"+poster));
         }
         return values;
     }
