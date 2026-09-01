@@ -1,6 +1,5 @@
 package net.filemaid.infrastructure.metadata;
 
-import java.lang.reflect.Method;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -9,32 +8,10 @@ import net.filemaid.core.model.MetadataCandidate;
 import net.filemaid.core.model.RankedCandidate;
 
 /**
- * Ranks candidates using the legacy engine's {@code NameSimilarityMetric} when
- * it is on the classpath, and falls back to a small built-in similarity
- * otherwise. Both paths are local string comparisons — no network access.
+ * Ranks candidates by title similarity using a built-in normalized Levenshtein
+ * distance, plus a small bonus for a matching year. Pure local computation.
  */
-public final class LegacySimilarityRanker implements SimilarityRanker {
-    private final Object nameMetric;
-    private final Method getSimilarity;
-
-    public LegacySimilarityRanker() {
-        Object metric = null;
-        Method method = null;
-        try {
-            Class<?> type = Class.forName("net.filemaid.similarity.NameSimilarityMetric");
-            metric = type.getConstructor().newInstance();
-            method = type.getMethod("getSimilarity", Object.class, Object.class);
-        } catch (Throwable ignored) {
-            // legacy engine not present; use fallback similarity
-        }
-        this.nameMetric = metric;
-        this.getSimilarity = method;
-    }
-
-    public boolean available() {
-        return nameMetric != null && getSimilarity != null;
-    }
-
+public final class BuiltinSimilarityRanker implements SimilarityRanker {
     @Override
     public List<RankedCandidate> rank(String query, Integer year, List<MetadataCandidate> candidates) {
         if (candidates == null || candidates.isEmpty()) return List.of();
@@ -51,18 +28,7 @@ public final class LegacySimilarityRanker implements SimilarityRanker {
         return best;
     }
 
-    private float similarity(String a, String b) {
-        if (available()) {
-            try {
-                return ((Number) getSimilarity.invoke(nameMetric, a, b)).floatValue();
-            } catch (Throwable ignored) {
-                // fall through to built-in similarity
-            }
-        }
-        return fallback(a, b);
-    }
-
-    static float fallback(String a, String b) {
+    static float similarity(String a, String b) {
         String x = normalize(a);
         String y = normalize(b);
         if (x.isEmpty() || y.isEmpty()) return 0f;

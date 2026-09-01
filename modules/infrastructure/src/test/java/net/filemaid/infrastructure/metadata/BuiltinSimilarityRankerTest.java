@@ -8,18 +8,18 @@ import net.filemaid.core.model.MetadataCandidate;
 import net.filemaid.core.model.MetadataType;
 import org.junit.jupiter.api.Test;
 
-class LegacySimilarityRankerTest {
-    private final LegacySimilarityRanker ranker = new LegacySimilarityRanker();
+class BuiltinSimilarityRankerTest {
+    private final BuiltinSimilarityRanker ranker = new BuiltinSimilarityRanker();
 
     @Test
-    void fallbackSimilarityReturnsOneForIdentical() {
-        assertEquals(1f, LegacySimilarityRanker.fallback("Example Show", "Example Show"), 1e-6);
+    void similarityReturnsOneForIdentical() {
+        assertEquals(1f, BuiltinSimilarityRanker.similarity("Example Show", "Example Show"), 1e-6);
     }
 
     @Test
-    void fallbackSimilarityIsHigherForCloserTitles() {
-        float close = LegacySimilarityRanker.fallback("Example Show", "Example Shows");
-        float far = LegacySimilarityRanker.fallback("Example Show", "Totally Different");
+    void similarityIsHigherForCloserTitles() {
+        float close = BuiltinSimilarityRanker.similarity("Example Show", "Example Shows");
+        float far = BuiltinSimilarityRanker.similarity("Example Show", "Totally Different");
         assertTrue(close > far);
     }
 
@@ -29,7 +29,6 @@ class LegacySimilarityRankerTest {
         var close = candidate("close", "Example Shows", 2020);
         var far = candidate("far", "Something Else", 2020);
         var ranked = ranker.rank("Example Show", 2020, List.of(far, exact, close));
-
         for (int i = 1; i < ranked.size(); i++) {
             assertTrue(ranked.get(i - 1).score() >= ranked.get(i).score(), "scores must be descending");
         }

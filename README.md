@@ -109,9 +109,6 @@ docker compose up --build
 
 # 启动服务（默认媒体根 ./data/media）
 .\gradlew.bat :modules:server:bootRun
-
-# 开发期启用旧引擎季集匹配器
-.\gradlew.bat :modules:server:bootRun -PwithLegacyEngine
 ```
 
 ## 🏗️ 项目结构
