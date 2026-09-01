@@ -132,6 +132,7 @@ public final class SettingsService {
                 "metadata.matchThreshold", "metadata.candidateLimit", "postprocess.generateNfo", "postprocess.downloadArtwork", "postprocess.artworkType", "files.defaultOperation",
                 "naming.preset", "naming.titlePreference", "naming.unknownTitle", "scan.ignorePatterns", "scan.minimumFileSizeMb", "scan.extensions",
                 "files.conflictPolicy", "files.historyRetentionDays", "postprocess.cleanEmptyDirectories", "notification.webhookUrl"));
+        runtimeKeys.addAll(Set.of("system.timezone", "system.logLevel"));
         runtimeKeys.forEach(key -> map.computeIfPresent(key, (ignored, value) -> new Definition(value.key(), value.category(), value.type(), value.defaultValue(), value.secret(), true, value.min(), value.max(), value.options())));
         return java.util.Collections.unmodifiableMap(map);
     }

@@ -3,6 +3,7 @@ package net.filemaid.server.api;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import net.filemaid.application.service.SettingsService;
+import net.filemaid.server.RuntimeSystemSettings;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,7 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class SettingsController {
     private static final String MASK = "********";
     private final SettingsService service;
-    public SettingsController(SettingsService service) { this.service = service; }
+    private final RuntimeSystemSettings runtimeSystemSettings;
+    public SettingsController(SettingsService service, RuntimeSystemSettings runtimeSystemSettings) {
+        this.service = service;
+        this.runtimeSystemSettings = runtimeSystemSettings;
+    }
 
     @GetMapping Map<String, String> get() {
         Map<String, String> result = new LinkedHashMap<>(service.findAll());
@@ -33,6 +38,7 @@ public class SettingsController {
             if (MASK.equals(safe.get(key))) safe.remove(key);
         });
         service.update(safe);
+        runtimeSystemSettings.apply(safe);
         return get();
     }
 }

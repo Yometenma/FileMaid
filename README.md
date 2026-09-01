@@ -36,7 +36,7 @@ FileMaid 运行在你自己的服务器上，通过 Web UI 帮你扫描媒体目
 
 FileMaid 已打通「扫描 → 匹配 → 预览 → 校验 → 执行 → 历史/撤销」的完整闭环，后端能力全部自研（无反射、无旧引擎运行时依赖）。Web UI 覆盖整理、历史、设置三页。
 
-媒体目录默认以只读方式挂载；要启用写操作，需同时把 Docker 卷改为 `:rw` 并设置 `FILEMAID_ROOTS_0_WRITABLE=true`。首次访问需创建单用户管理员账号，密钥读取始终脱敏。
+媒体目录默认以只读方式挂载；要启用写操作，需同时把 Docker 卷改为 `:rw` 并设置 `FILEMAID_ROOT_WRITABLE=true`。首次访问需创建单用户管理员账号，密钥读取始终脱敏。
 
 ## 🚀 快速开始（Docker）
 
@@ -45,11 +45,11 @@ mkdir -p data/media config   # data/media 放入你的媒体文件
 docker compose up --build
 ```
 
-打开 <http://localhost:8080>，完成首次设置并登录后，选择根目录、扫描媒体、匹配元数据、预览并确认执行。
+示例 Compose 当前映射到 <http://localhost:8081>（容器内仍为 8080），完成首次设置并登录后，选择根目录、扫描媒体、匹配元数据、预览并确认执行。
 
-> 示例 Compose 默认把媒体目录以**只读**方式挂载（`:ro`），首次试用建议保持只读，只做扫描、匹配和校验。确认目标路径符合预期后，再把卷改为 `:rw` 并在 `.env` 里设置 `FILEMAID_ROOTS_0_WRITABLE=true`。
+> 示例 Compose 默认把媒体目录以**只读**方式挂载（`:ro`），首次试用建议保持只读，只做扫描、匹配和校验。确认目标路径符合预期后，再把卷改为 `:rw` 并在 `.env` 里设置 `FILEMAID_ROOT_WRITABLE=true`。
 
-远程访问请参阅 [反向代理与 HTTPS](docs/reverse-proxy.md)。
+远程访问请参阅 [反向代理与 HTTPS](docs/reverse-proxy.md)。元数据服务的许可、署名、限流与缓存原则见 [元数据提供器策略](docs/metadata-provider-policy.md)。
 
 ## ⚙️ 配置
 
@@ -59,7 +59,7 @@ docker compose up --build
 | --- | --- | --- |
 | `FILEMAID_PORT` | `8080` | HTTP 服务端口 |
 | `FILEMAID_MEDIA_ROOT` | `./data/media` | 媒体根目录（仅暴露根目录内相对路径） |
-| `FILEMAID_ROOTS_0_WRITABLE` | `false` | 是否允许写操作（重命名/移动/复制/硬链接） |
+| `FILEMAID_ROOT_WRITABLE` | `false` | 是否允许写操作（重命名/移动/复制/硬链接） |
 | `FILEMAID_DB_PATH` | `./config/filemaid.db` | SQLite 数据库文件路径 |
 | `FILEMAID_AUTH_ENABLED` | `true` | 是否启用单用户登录；受控开发环境可设 `false` |
 | `FILEMAID_SECURE_COOKIES` | `false` | HTTPS 反代后设 `true` 让会话 Cookie 带 Secure |

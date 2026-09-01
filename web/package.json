@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "vue-tsc -b && vite build"
+    "build": "vue-tsc -b && vite build",
+    "test": "vitest run --configLoader runner"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
@@ -15,8 +16,10 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.1",
+    "jsdom": "^29.1.1",
     "typescript": "^5.9.3",
     "vite": "^7.1.7",
+    "vitest": "^4.1.11",
     "vue-tsc": "^3.1.0"
   }
 }
