@@ -40,9 +40,12 @@ public class MediaController {
 
     @PostMapping("/rename-plans/preview")
     List<RenamePreview> preview(@Valid @RequestBody PreviewRequest request) {
-        return previewService.preview(request.paths(), request.selections());
+        if (request.rootId() == null || request.rootId().isBlank()) {
+            return previewService.preview(request.paths(), request.selections());
+        }
+        return previewService.preview(request.rootId(), request.paths(), request.selections());
     }
 
     public record ParseRequest(@NotEmpty List<String> names) {}
-    public record PreviewRequest(@NotEmpty List<String> paths, List<MetadataSelection> selections) {}
+    public record PreviewRequest(String rootId, @NotEmpty List<String> paths, List<MetadataSelection> selections) {}
 }

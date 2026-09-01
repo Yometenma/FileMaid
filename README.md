@@ -87,7 +87,7 @@ docker compose up --build
 | `GET /api/v1/roots/{rootId}/probe?path=` | 探测单个文件的媒体信息（编码 / 分辨率 / 音轨字幕轨） |
 | `POST /api/v1/media/parse` | 解析文件名（`{ "names": [...] }`） |
 | `POST /api/v1/media/groups/analyze` | 媒体分组 + 字幕关联分析 |
-| `POST /api/v1/rename-plans/preview` | 生成改名预览（可携带已选元数据） |
+| `POST /api/v1/rename-plans/preview` | 生成改名预览（可携带已选元数据；传 `rootId` 触发媒体探测并标记重名冲突） |
 | `GET /api/v1/metadata/providers` | 元数据提供器状态 |
 | `GET /api/v1/metadata/search?query=&type=&locale=&limit=` | TMDB 候选搜索（`type` = `MOVIE` / `SERIES`） |
 | `GET /api/v1/naming/templates` | 查看当前生效的命名模板 |

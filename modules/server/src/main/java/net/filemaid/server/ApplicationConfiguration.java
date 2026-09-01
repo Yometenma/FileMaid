@@ -32,7 +32,7 @@ public class ApplicationConfiguration {
         var naming = properties.naming();
         return new SafeNamingTemplateEngine(naming.series(), naming.movie(), naming.unknown());
     }
-    @Bean RenamePreviewService renamePreviewService(MediaNameParser parser, NamingTemplateEngine naming) { return new RenamePreviewService(parser, naming); }
+    @Bean RenamePreviewService renamePreviewService(MediaNameParser parser, NamingTemplateEngine naming, ProbeMediaInfoService probeService) { return new RenamePreviewService(parser, naming, probeService); }
     @Bean MetadataProvider metadataProvider(FileMaidProperties properties) { return new PreferredTmdbMetadataProvider(properties.metadata().tmdbApiKey()); }
     @Bean SearchMetadataService searchMetadataService(MetadataProvider provider) { return new SearchMetadataService(provider); }
     @Bean AnalyzeMediaGroupsService analyzeMediaGroupsService(MediaNameParser parser) { return new AnalyzeMediaGroupsService(parser); }
