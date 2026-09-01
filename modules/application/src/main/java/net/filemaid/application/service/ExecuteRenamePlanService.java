@@ -7,22 +7,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import net.filemaid.application.port.OperationHistoryRepository;
 import net.filemaid.core.model.OperationResult;
 import net.filemaid.core.model.RenameOperation;
 import net.filemaid.core.model.StorageRoot;
 
 /**
  * Executes a rename plan's write operations (MOVE / COPY / HARDLINK). It never
- * overwrites an existing target, refuses read-only storage roots, and re-checks
- * source/target right before each operation, returning a per-file result.
+ * overwrites an existing target, refuses read-only storage roots, re-checks
+ * source/target right before each operation, returns a per-file result, and
+ * records the results in the operation history.
  */
 public final class ExecuteRenamePlanService {
     private final Map<String, StorageRoot> roots;
     private final StoragePathPolicy pathPolicy;
+    private final OperationHistoryRepository history;
 
-    public ExecuteRenamePlanService(List<StorageRoot> roots, StoragePathPolicy pathPolicy) {
+    public ExecuteRenamePlanService(List<StorageRoot> roots, StoragePathPolicy pathPolicy, OperationHistoryRepository history) {
         this.roots = roots.stream().collect(Collectors.toUnmodifiableMap(StorageRoot::id, Function.identity()));
         this.pathPolicy = pathPolicy;
+        this.history = history;
     }
 
     public List<OperationResult> execute(String rootId, List<RenameOperation> operations) {
@@ -33,6 +37,7 @@ public final class ExecuteRenamePlanService {
         for (RenameOperation operation : operations) {
             results.add(executeOne(root, operation));
         }
+        if (history != null && !results.isEmpty()) history.append(results);
         return results;
     }
 

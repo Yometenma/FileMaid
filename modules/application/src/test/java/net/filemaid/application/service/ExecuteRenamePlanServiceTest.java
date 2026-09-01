@@ -19,7 +19,8 @@ class ExecuteRenamePlanServiceTest {
     private ExecuteRenamePlanService service(boolean writable) {
         return new ExecuteRenamePlanService(
                 List.of(new StorageRoot("media", tempDir, writable)),
-                new StoragePathPolicy());
+                new StoragePathPolicy(),
+                null);
     }
 
     @Test

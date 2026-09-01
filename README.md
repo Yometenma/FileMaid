@@ -102,6 +102,8 @@ docker compose up --build
 | `POST /api/v1/metadata/match` | 解析文件名并自动匹配排序候选（标题/年份相似度） |
 | `PUT /api/v1/match-decisions` | 保存用户确认的匹配决策 |
 | `GET /api/v1/match-decisions` | 查询匹配决策（可选 `source` 参数） |
+| `GET /api/v1/operations` | 查询操作历史 |
+| `POST /api/v1/operations/{id}/undo` | 撤销某个操作 |
 | `GET /api/v1/naming/templates` | 查看当前生效的命名模板 |
 | `GET /actuator/health` | Spring Actuator 健康端点 |
 

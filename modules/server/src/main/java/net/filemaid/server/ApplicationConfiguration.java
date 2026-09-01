@@ -7,6 +7,8 @@ import net.filemaid.application.port.MediaInfoProvider;
 import net.filemaid.application.port.MetadataProvider;
 import net.filemaid.application.port.NamingTemplateEngine;
 import net.filemaid.application.port.SimilarityRanker;
+import net.filemaid.application.port.MatchDecisionRepository;
+import net.filemaid.application.port.OperationHistoryRepository;
 import net.filemaid.application.service.ParseMediaNameService;
 import net.filemaid.application.service.ProbeMediaInfoService;
 import net.filemaid.application.service.RenamePreviewService;
@@ -16,9 +18,10 @@ import net.filemaid.application.service.SearchMetadataService;
 import net.filemaid.application.service.AnalyzeMediaGroupsService;
 import net.filemaid.application.service.BuildRenamePlanService;
 import net.filemaid.application.service.ExecuteRenamePlanService;
-import net.filemaid.application.port.MatchDecisionRepository;
 import net.filemaid.application.service.MatchDecisionService;
 import net.filemaid.application.service.MatchMetadataService;
+import net.filemaid.application.service.OperationHistoryService;
+import net.filemaid.application.service.UndoService;
 import net.filemaid.application.service.ValidateRenamePlanService;
 import net.filemaid.core.model.StorageRoot;
 import net.filemaid.infrastructure.filesystem.LocalMediaScanner;
@@ -32,6 +35,7 @@ import net.filemaid.infrastructure.metadata.TvMazeHttpMetadataProvider;
 import net.filemaid.infrastructure.metadata.TvdbHttpMetadataProvider;
 import net.filemaid.infrastructure.naming.SafeNamingTemplateEngine;
 import net.filemaid.infrastructure.persistence.SqliteMatchDecisionRepository;
+import net.filemaid.infrastructure.persistence.SqliteOperationHistoryRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -48,16 +52,15 @@ public class ApplicationConfiguration {
     @Bean RenamePreviewService renamePreviewService(MediaNameParser parser, NamingTemplateEngine naming, ProbeMediaInfoService probeService) { return new RenamePreviewService(parser, naming, probeService); }
     @Bean BuildRenamePlanService buildRenamePlanService(RenamePreviewService previewService) { return new BuildRenamePlanService(previewService); }
     @Bean ValidateRenamePlanService validateRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy) {
-        List<StorageRoot> roots = properties.roots().stream()
-                .map(root -> new StorageRoot(root.id(), root.path(), root.writable()))
-                .toList();
-        return new ValidateRenamePlanService(roots, pathPolicy);
+        return new ValidateRenamePlanService(storageRoots(properties), pathPolicy);
     }
-    @Bean ExecuteRenamePlanService executeRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy) {
-        List<StorageRoot> roots = properties.roots().stream()
-                .map(root -> new StorageRoot(root.id(), root.path(), root.writable()))
-                .toList();
-        return new ExecuteRenamePlanService(roots, pathPolicy);
+    @Bean OperationHistoryRepository operationHistoryRepository(FileMaidProperties properties) { return new SqliteOperationHistoryRepository(properties.dbPath()); }
+    @Bean OperationHistoryService operationHistoryService(OperationHistoryRepository repository) { return new OperationHistoryService(repository); }
+    @Bean UndoService undoService(FileMaidProperties properties, StoragePathPolicy pathPolicy, OperationHistoryRepository history) {
+        return new UndoService(storageRoots(properties), pathPolicy, history);
+    }
+    @Bean ExecuteRenamePlanService executeRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy, OperationHistoryRepository history) {
+        return new ExecuteRenamePlanService(storageRoots(properties), pathPolicy, history);
     }
     @Bean SearchMetadataService searchMetadataService(List<MetadataProvider> providers) { return new SearchMetadataService(providers); }
     @Bean SimilarityRanker similarityRanker() { return new BuiltinSimilarityRanker(); }
@@ -67,18 +70,10 @@ public class ApplicationConfiguration {
     @Bean AnalyzeMediaGroupsService analyzeMediaGroupsService(MediaNameParser parser) { return new AnalyzeMediaGroupsService(parser); }
     @Bean MediaInfoProvider mediaInfoProvider(FileMaidProperties properties) { return new FfprobeMediaInfoProvider(properties.probe().ffprobePath()); }
     @Bean ProbeMediaInfoService probeMediaInfoService(FileMaidProperties properties, StoragePathPolicy pathPolicy, MediaInfoProvider provider) {
-        List<StorageRoot> roots = properties.roots().stream()
-                .map(root -> new StorageRoot(root.id(), root.path(), root.writable()))
-                .toList();
-        return new ProbeMediaInfoService(roots, pathPolicy, provider);
+        return new ProbeMediaInfoService(storageRoots(properties), pathPolicy, provider);
     }
-
-    @Bean
-    ScanMediaService scanMediaService(FileMaidProperties properties, MediaScanner scanner, StoragePathPolicy pathPolicy) {
-        List<StorageRoot> roots = properties.roots().stream()
-                .map(root -> new StorageRoot(root.id(), root.path(), root.writable()))
-                .toList();
-        return new ScanMediaService(roots, scanner, pathPolicy);
+    @Bean ScanMediaService scanMediaService(FileMaidProperties properties, MediaScanner scanner, StoragePathPolicy pathPolicy) {
+        return new ScanMediaService(storageRoots(properties), scanner, pathPolicy);
     }
 
     @Bean MetadataProvider tmdbMetadataProvider(FileMaidProperties properties) { return new TmdbHttpMetadataProvider(properties.metadata().tmdbApiKey()); }
@@ -86,4 +81,10 @@ public class ApplicationConfiguration {
     @Bean MetadataProvider omdbMetadataProvider(FileMaidProperties properties) { return new OmdbHttpMetadataProvider(properties.metadata().omdbApiKey()); }
     @Bean MetadataProvider tvmazeMetadataProvider(FileMaidProperties properties) { return new TvMazeHttpMetadataProvider(properties.metadata().tvmazeEnabled()); }
     @Bean MetadataProvider anidbMetadataProvider(FileMaidProperties properties) { return new AnidbHttpMetadataProvider(properties.metadata().anidbEnabled()); }
+
+    private List<StorageRoot> storageRoots(FileMaidProperties properties) {
+        return properties.roots().stream()
+                .map(root -> new StorageRoot(root.id(), root.path(), root.writable()))
+                .toList();
+    }
 }
