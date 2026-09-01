@@ -18,7 +18,8 @@ RUN if [ -n "$PROXY_URL" ]; then export HTTP_PROXY=$PROXY_URL HTTPS_PROXY=$PROXY
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* \
+ARG PROXY_URL=
+RUN if [ -n "$PROXY_URL" ]; then export HTTP_PROXY=$PROXY_URL HTTPS_PROXY=$PROXY_URL; fi && apt-get update && apt-get install -y --no-install-recommends curl ffmpeg && rm -rf /var/lib/apt/lists/* \
     && groupadd --system filemaid && useradd --system --gid filemaid --home-dir /app filemaid \
     && mkdir -p /config /media && chown -R filemaid:filemaid /app /config /media
 COPY --from=build /workspace/modules/server/build/libs/server-*.jar /app/filemaid.jar
