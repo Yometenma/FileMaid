@@ -8,6 +8,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -33,17 +36,23 @@ public final class AnidbHttpMetadataProvider implements MetadataProvider {
     private final HttpClient client;
     private final String indexUrl;
     private final Duration timeout;
+    private final Path cacheFile;
     private volatile List<MetadataCandidate> cachedIndex;
 
     public AnidbHttpMetadataProvider(boolean enabled) {
-        this(enabled, null, null, null);
+        this(enabled, null, null, null, null);
     }
 
     public AnidbHttpMetadataProvider(boolean enabled, String endpoint, HttpClient client, Duration timeout) {
+        this(enabled, endpoint, client, timeout, null);
+    }
+
+    public AnidbHttpMetadataProvider(boolean enabled, String endpoint, HttpClient client, Duration timeout, Path cacheFile) {
         this.enabled = enabled;
         this.indexUrl = endpoint == null || endpoint.isBlank() ? DEFAULT_INDEX_URL : endpoint;
         this.client = client == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : client;
         this.timeout = timeout == null ? Duration.ofSeconds(120) : timeout;
+        this.cacheFile = cacheFile;
     }
 
     @Override public String id() { return "anidb"; }
@@ -78,6 +87,24 @@ public final class AnidbHttpMetadataProvider implements MetadataProvider {
 
     private synchronized List<MetadataCandidate> loadIndex() throws Exception {
         if (cachedIndex != null) return cachedIndex;
+        if (cacheFile != null && Files.isRegularFile(cacheFile)
+                && System.currentTimeMillis() - Files.getLastModifiedTime(cacheFile).toMillis() < Duration.ofHours(24).toMillis()) {
+            cachedIndex = parseTitles(Files.readString(cacheFile, StandardCharsets.UTF_8));
+            return cachedIndex;
+        }
+        try {
+            cachedIndex = downloadIndex();
+            return cachedIndex;
+        } catch (Exception failure) {
+            if (cacheFile != null && Files.isRegularFile(cacheFile)) {
+                cachedIndex = parseTitles(Files.readString(cacheFile, StandardCharsets.UTF_8));
+                return cachedIndex;
+            }
+            throw failure;
+        }
+    }
+
+    private List<MetadataCandidate> downloadIndex() throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create(indexUrl))
                 .timeout(timeout)
                 .GET().build();
@@ -94,8 +121,13 @@ public final class AnidbHttpMetadataProvider implements MetadataProvider {
                 sb.append(line).append('\n');
             }
         }
-        cachedIndex = parseTitles(sb.toString());
-        return cachedIndex;
+        if (cacheFile != null) {
+            Files.createDirectories(cacheFile.toAbsolutePath().getParent());
+            Path temporary = cacheFile.resolveSibling(cacheFile.getFileName() + ".tmp");
+            Files.writeString(temporary, sb, StandardCharsets.UTF_8);
+            Files.move(temporary, cacheFile, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return parseTitles(sb.toString());
     }
 
     static List<MetadataCandidate> parseTitles(String tsv) {

@@ -65,6 +65,12 @@ onMounted(load)
       <div v-if="activeCategory==='providers'" class="provider-tests">
         <div v-for="id in ['tmdb','tvdb','omdb','tvmaze','anidb']" :key="id"><span><i :class="providerTests[id]?.success?'ok':'idle'"></i>{{ id.toUpperCase() }}</span><small v-if="providerTests[id]">{{ providerTests[id].message }}</small><el-button size="small" :loading="testingProvider===id" @click="testProvider(id)">测试连接</el-button></div>
       </div>
+      <div v-if="activeCategory==='providers'" class="provider-credits">
+        <strong>数据来源与许可</strong>
+        <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        <p>Metadata provided by <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer">TMDB</a> and <a href="https://thetvdb.com" target="_blank" rel="noopener noreferrer">TheTVDB</a>. TV data from <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer">TVMaze</a> is available under CC BY-SA.</p>
+        <small>第三方图片的权利不等同于元数据 API 许可；下载和使用前请确认适用权利。</small>
+      </div>
       <div v-if="activeCategory==='system'" class="diagnostics" v-loading="diagnosing">
         <div><span :class="diagnostics?.databaseWritable?'healthy':'failed'"></span><strong>SQLite 数据库</strong><small>{{ diagnostics?.databaseWritable?'可写':'不可写' }}</small></div>
         <div><span :class="diagnostics?.ffprobeAvailable?'healthy':'failed'"></span><strong>FFprobe</strong><small>{{ diagnostics?.ffprobeAvailable?'可用':'不可用' }}</small></div>

@@ -5,9 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class AnidbHttpMetadataProviderTest {
+    @TempDir Path temporaryDirectory;
     @Test
     void parsesTitlesFromTsv() {
         String tsv = """
@@ -30,5 +36,18 @@ class AnidbHttpMetadataProviderTest {
     void availableReflectsEnabledFlag() {
         assertTrue(new AnidbHttpMetadataProvider(true).available());
         assertFalse(new AnidbHttpMetadataProvider(false).available());
+    }
+
+    @Test
+    void reusesFreshDiskIndexWithoutDownloading() throws Exception {
+        Path cache = temporaryDirectory.resolve("anime-titles.dat");
+        Files.writeString(cache, "1|1|en|Cached Anime\n");
+        var provider = new AnidbHttpMetadataProvider(true, "https://invalid.example/index.gz",
+                HttpClient.newHttpClient(), Duration.ofMillis(50), cache);
+
+        var results = provider.search("cached", net.filemaid.core.model.MetadataType.SERIES, java.util.Locale.ENGLISH, 5);
+
+        assertEquals(1, results.size());
+        assertEquals("Cached Anime", results.get(0).title());
     }
 }

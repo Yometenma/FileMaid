@@ -6,8 +6,11 @@ import java.net.PasswordAuthentication;
 import java.net.ProxySelector;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import net.filemaid.application.port.MetadataProvider;
 import net.filemaid.application.service.SettingsService;
 import net.filemaid.core.model.MetadataCandidate;
@@ -23,6 +26,11 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
     private final String providerId;
     private final FileMaidProperties properties;
     private final SettingsService settings;
+    private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final Map<String, Object> cacheLocks = new ConcurrentHashMap<>();
+    private static final long SUCCESS_TTL_MS = Duration.ofHours(24).toMillis();
+    private static final long EMPTY_TTL_MS = Duration.ofHours(1).toMillis();
+    private static final long STALE_TTL_MS = Duration.ofDays(7).toMillis();
 
     public RuntimeMetadataProvider(String providerId, FileMaidProperties properties, SettingsService settings) {
         this.providerId = providerId; this.properties = properties; this.settings = settings;
@@ -33,14 +41,48 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
     @Override public String status() { return delegate().status(); }
 
     @Override public List<MetadataCandidate> search(String query, MetadataType type, Locale locale, int limit) throws Exception {
-        int retries = integer("network.retryCount", 2, 0, 10);
-        Exception last = null;
-        for (int attempt = 0; attempt <= retries; attempt++) {
-            try { return delegate().search(query, type, locale, limit); }
-            catch (Exception failure) { last = failure; }
+        String key = cacheKey(query, type, locale, limit);
+        CacheEntry existing = cache.get(key);
+        long now = System.currentTimeMillis();
+        if (existing != null && now - existing.createdAt() < existing.ttlMillis()) return existing.value();
+        Object lock = cacheLocks.computeIfAbsent(key, ignored -> new Object());
+        synchronized (lock) {
+            try {
+                existing = cache.get(key);
+                now = System.currentTimeMillis();
+                if (existing != null && now - existing.createdAt() < existing.ttlMillis()) return existing.value();
+                int retries = integer("network.retryCount", 2, 0, 10);
+                Exception last = null;
+                for (int attempt = 0; attempt <= retries; attempt++) {
+                    try {
+                        List<MetadataCandidate> result = List.copyOf(delegate().search(query, type, locale, limit));
+                        if (cache.size() >= 1_000) cache.clear();
+                        cache.put(key, new CacheEntry(result, now, result.isEmpty() ? EMPTY_TTL_MS : SUCCESS_TTL_MS));
+                        return result;
+                    } catch (Exception failure) {
+                        last = failure;
+                        if (attempt < retries) backoff(attempt, failure);
+                    }
+                }
+                if (existing != null && now - existing.createdAt() < STALE_TTL_MS) return existing.value();
+                throw last;
+            } finally {
+                cacheLocks.remove(key, lock);
+            }
         }
-        throw last;
     }
+
+    private String cacheKey(String query, MetadataType type, Locale locale, int limit) {
+        return String.join("|", providerId, value("endpoint", ""), type.name(), locale.toLanguageTag(), Integer.toString(limit), query.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private void backoff(int attempt, Exception failure) throws InterruptedException {
+        long base = failure.getMessage() != null && failure.getMessage().contains("HTTP 429") ? 1_000L : 250L;
+        long delay = Math.min(8_000L, base << Math.min(attempt, 5));
+        Thread.sleep(delay + java.util.concurrent.ThreadLocalRandom.current().nextLong(100L));
+    }
+
+    private record CacheEntry(List<MetadataCandidate> value, long createdAt, long ttlMillis) { }
 
     private MetadataProvider delegate() {
         Duration timeout = Duration.ofSeconds(integer("network.timeoutSeconds", 20, 1, 300));
@@ -52,7 +94,9 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
             case "tvdb" -> new TvdbHttpMetadataProvider(enabled ? value("apiKey", properties.metadata().tvdbApiKey()) : "", value("pin", properties.metadata().tvdbPin()), endpoint, client, timeout);
             case "omdb" -> new OmdbHttpMetadataProvider(enabled ? value("apiKey", properties.metadata().omdbApiKey()) : "", endpoint, client, timeout);
             case "tvmaze" -> new TvMazeHttpMetadataProvider(enabled, endpoint, client, timeout);
-            case "anidb" -> new AnidbHttpMetadataProvider(enabled, endpoint, client, timeout.compareTo(Duration.ofSeconds(120)) < 0 ? Duration.ofSeconds(120) : timeout);
+            case "anidb" -> new AnidbHttpMetadataProvider(enabled, endpoint, client,
+                    timeout.compareTo(Duration.ofSeconds(120)) < 0 ? Duration.ofSeconds(120) : timeout,
+                    Path.of(properties.dbPath()).toAbsolutePath().getParent().resolve("cache/anidb/anime-titles.dat"));
             default -> throw new IllegalArgumentException("Unknown metadata provider: " + providerId);
         };
     }
