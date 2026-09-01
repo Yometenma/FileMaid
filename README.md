@@ -22,7 +22,7 @@ FileMaid 运行在你自己的服务器上，通过 Web UI 帮你扫描媒体目
 | 🔍 **扫描识别** | 识别电影、剧集、动漫、字幕和关联文件 |
 | 🏷️ **解析文件名** | 从文件名提取标题、年份、季数、集数 |
 | 🎞️ **媒体探测** | 用 ffprobe 读取分辨率、编解码器、音轨与字幕轨信息 |
-| 🎬 **元数据匹配** | 接入 TMDB，搜索候选并绑定到具体源文件 |
+| 🎬 **元数据匹配** | 接入 TMDB / TVDB，聚合搜索候选、自动匹配排序并绑定到源文件 |
 | 📐 **命名预览** | 用模板生成电影 / 剧集 / 未分类的目标路径 |
 | 🔗 **媒体分组** | 自动把字幕关联到对应视频，孤立字幕会给出提醒 |
 | 🛡️ **安全边界** | 路径越界保护、只读根目录，服务器绝对路径不外泄 |
@@ -56,6 +56,8 @@ docker compose up --build
 | `FILEMAID_SCAN_MAX_DEPTH` | `16` | 扫描最大目录深度 |
 | `FILEMAID_SCAN_MAX_FILES` | `10000` | 单次扫描最大文件数 |
 | `FILEMAID_TMDB_API_KEY` | *(空)* | TMDB API 密钥，未配置时扫描与预览仍可用 |
+| `FILEMAID_TVDB_API_KEY` | *(空)* | TVDB v4 API 密钥 |
+| `FILEMAID_TVDB_PIN` | *(空)* | TVDB v4 订阅者 PIN（可选） |
 | `FILEMAID_FFPROBE_PATH` | `ffprobe` | ffprobe 可执行文件路径（媒体探测） |
 | `FILEMAID_NAMING_SERIES` | *(内置)* | 剧集命名模板 |
 | `FILEMAID_NAMING_MOVIE` | *(内置)* | 电影命名模板 |

@@ -27,7 +27,7 @@ class MatchMetadataServiceTest {
                 return List.of(new MetadataCandidate("test", "1", MetadataType.SERIES, "Example Show", List.of(), 2020, null));
             }
         };
-        var searchService = new SearchMetadataService(provider);
+        var searchService = new SearchMetadataService(List.of(provider));
         SimilarityRanker ranker = (query, year, candidates) -> candidates.stream()
                 .map(c -> new RankedCandidate(c, 1.0f))
                 .toList();

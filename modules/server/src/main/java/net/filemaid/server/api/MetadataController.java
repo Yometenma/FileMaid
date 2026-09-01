@@ -28,7 +28,7 @@ public class MetadataController {
     }
 
     @GetMapping("/providers")
-    List<SearchMetadataService.ProviderStatus> providers() { return List.of(service.status()); }
+    List<SearchMetadataService.ProviderStatus> providers() { return service.statuses(); }
 
     @GetMapping("/search")
     List<MetadataCandidate> search(

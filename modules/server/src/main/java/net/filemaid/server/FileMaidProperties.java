@@ -9,7 +9,7 @@ public record FileMaidProperties(List<Root> roots, Scan scan, Metadata metadata,
     public FileMaidProperties {
         roots = roots == null ? List.of() : List.copyOf(roots);
         scan = scan == null ? new Scan(16, 10_000) : scan;
-        metadata = metadata == null ? new Metadata(null) : metadata;
+        metadata = metadata == null ? new Metadata(null, null, null) : metadata;
         naming = naming == null ? new Naming(null, null, null) : naming;
         probe = probe == null ? new Probe(null) : probe;
     }
@@ -23,7 +23,7 @@ public record FileMaidProperties(List<Root> roots, Scan scan, Metadata metadata,
         }
     }
 
-    public record Metadata(String tmdbApiKey) {}
+    public record Metadata(String tmdbApiKey, String tvdbApiKey, String tvdbPin) {}
     public record Naming(String series, String movie, String unknown) {}
     public record Probe(String ffprobePath) {}
 }

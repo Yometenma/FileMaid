@@ -21,6 +21,7 @@ import net.filemaid.infrastructure.mediainfo.FfprobeMediaInfoProvider;
 import net.filemaid.infrastructure.parser.LegacyMediaNameParserAdapter;
 import net.filemaid.infrastructure.metadata.LegacySimilarityRanker;
 import net.filemaid.infrastructure.metadata.PreferredTmdbMetadataProvider;
+import net.filemaid.infrastructure.metadata.TvdbHttpMetadataProvider;
 import net.filemaid.infrastructure.naming.SafeNamingTemplateEngine;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,8 +37,9 @@ public class ApplicationConfiguration {
         return new SafeNamingTemplateEngine(naming.series(), naming.movie(), naming.unknown());
     }
     @Bean RenamePreviewService renamePreviewService(MediaNameParser parser, NamingTemplateEngine naming, ProbeMediaInfoService probeService) { return new RenamePreviewService(parser, naming, probeService); }
-    @Bean MetadataProvider metadataProvider(FileMaidProperties properties) { return new PreferredTmdbMetadataProvider(properties.metadata().tmdbApiKey()); }
-    @Bean SearchMetadataService searchMetadataService(MetadataProvider provider) { return new SearchMetadataService(provider); }
+    @Bean MetadataProvider tmdbMetadataProvider(FileMaidProperties properties) { return new PreferredTmdbMetadataProvider(properties.metadata().tmdbApiKey()); }
+    @Bean MetadataProvider tvdbMetadataProvider(FileMaidProperties properties) { return new TvdbHttpMetadataProvider(properties.metadata().tvdbApiKey(), properties.metadata().tvdbPin()); }
+    @Bean SearchMetadataService searchMetadataService(List<MetadataProvider> providers) { return new SearchMetadataService(providers); }
     @Bean SimilarityRanker similarityRanker() { return new LegacySimilarityRanker(); }
     @Bean MatchMetadataService matchMetadataService(MediaNameParser parser, SearchMetadataService searchService, SimilarityRanker ranker) { return new MatchMetadataService(parser, searchService, ranker); }
     @Bean AnalyzeMediaGroupsService analyzeMediaGroupsService(MediaNameParser parser) { return new AnalyzeMediaGroupsService(parser); }

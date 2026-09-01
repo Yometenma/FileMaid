@@ -21,6 +21,8 @@ filemaid:
     max-files: ${FILEMAID_SCAN_MAX_FILES:10000}
   metadata:
     tmdb-api-key: ${FILEMAID_TMDB_API_KEY:}
+    tvdb-api-key: ${FILEMAID_TVDB_API_KEY:}
+    tvdb-pin: ${FILEMAID_TVDB_PIN:}
   naming:
     series: ${FILEMAID_NAMING_SERIES:}
     movie: ${FILEMAID_NAMING_MOVIE:}
