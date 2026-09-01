@@ -8,10 +8,13 @@ import net.filemaid.application.service.BrowseStorageService;
 import net.filemaid.application.service.SettingsService;
 import net.filemaid.core.model.MediaFile;
 import net.filemaid.core.model.MediaInfo;
+import net.filemaid.server.BackgroundTaskService;
 import net.filemaid.server.FileMaidProperties;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,13 +27,15 @@ public class StorageController {
     private final FileMaidProperties properties;
     private final BrowseStorageService browseService;
     private final SettingsService settings;
+    private final BackgroundTaskService taskService;
 
-    public StorageController(ScanMediaService scanService, ProbeMediaInfoService probeService, FileMaidProperties properties, BrowseStorageService browseService, SettingsService settings) {
+    public StorageController(ScanMediaService scanService, ProbeMediaInfoService probeService, FileMaidProperties properties, BrowseStorageService browseService, SettingsService settings, BackgroundTaskService taskService) {
         this.scanService = scanService;
         this.probeService = probeService;
         this.properties = properties;
         this.browseService = browseService;
         this.settings = settings;
+        this.taskService = taskService;
     }
 
     @GetMapping("/{rootId}/directories")
@@ -55,6 +60,20 @@ public class StorageController {
                 .toList();
     }
 
+    @PostMapping("/{rootId}/scan")
+    ScanTaskResponse startScan(@PathVariable String rootId, @RequestBody ScanRequest request) {
+        int maxDepth = integer("scan.maxDepth", properties.scan().maxDepth());
+        int maxFiles = integer("scan.maxFiles", properties.scan().maxFiles());
+        String path = request.path() == null ? "" : request.path();
+        String taskId = taskService.submit("SCAN", "正在扫描…", context -> {
+            context.progress(10, "扫描目录");
+            List<MediaFile> files = scanService.scan(rootId, path, maxDepth, maxFiles);
+            context.progress(90, "扫描完成，整理结果");
+            return files.stream().map(MediaFileResponse::from).toList();
+        });
+        return new ScanTaskResponse(taskId);
+    }
+
     private int integer(String key, int fallback) {
         try { return Integer.parseInt(settings.value(key, Integer.toString(fallback))); }
         catch (NumberFormatException ignored) { return fallback; }
@@ -68,8 +87,10 @@ public class StorageController {
     }
 
     record RootResponse(String id, boolean writable) {}
+    record ScanRequest(String path) {}
+    record ScanTaskResponse(String taskId) {}
 
-    record MediaFileResponse(String rootId, String path, String kind, long size, String modifiedAt) {
+    public record MediaFileResponse(String rootId, String path, String kind, long size, String modifiedAt) {
         static MediaFileResponse from(MediaFile file) {
             String relativePath = file.relativePath().toString().replace('\\', '/');
             return new MediaFileResponse(

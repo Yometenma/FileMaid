@@ -20,22 +20,29 @@ import net.filemaid.core.model.StorageRoot;
 public final class ValidateRenamePlanService {
     private final Map<String, StorageRoot> roots;
     private final StoragePathPolicy pathPolicy;
+    private final SettingsService settings;
 
     public ValidateRenamePlanService(List<StorageRoot> roots, StoragePathPolicy pathPolicy) {
+        this(roots, pathPolicy, null);
+    }
+
+    public ValidateRenamePlanService(List<StorageRoot> roots, StoragePathPolicy pathPolicy, SettingsService settings) {
         this.roots = roots.stream().collect(Collectors.toUnmodifiableMap(StorageRoot::id, Function.identity()));
         this.pathPolicy = pathPolicy;
+        this.settings = settings;
     }
 
     public PlanValidation validate(String rootId, List<RenameOperation> operations) {
         StorageRoot root = roots.get(rootId);
         if (root == null) throw new IllegalArgumentException("Unknown storage root: " + rootId);
+        boolean skipConflicts = settings != null && "SKIP".equals(settings.value("files.conflictPolicy", "FAIL"));
         List<String> problems = new ArrayList<>();
         for (RenameOperation operation : operations) {
             try {
                 Path source = pathPolicy.resolve(root, operation.source().toString().replace('\\', '/'));
                 Path target = pathPolicy.resolve(root, operation.target().toString().replace('\\', '/'));
                 if (!Files.exists(source)) problems.add("源文件不存在: " + operation.source());
-                if (!source.equals(target) && Files.exists(target)) problems.add("目标已存在（冲突）: " + operation.target());
+                if (!source.equals(target) && Files.exists(target) && !skipConflicts) problems.add("目标已存在（冲突）: " + operation.target());
             } catch (IllegalArgumentException problem) {
                 problems.add(problem.getMessage());
             }

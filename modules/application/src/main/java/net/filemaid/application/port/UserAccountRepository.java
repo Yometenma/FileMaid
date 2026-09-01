@@ -6,5 +6,6 @@ public interface UserAccountRepository {
     boolean exists();
     Optional<Account> findByUsername(String username);
     void create(String username, String passwordHash);
+    void updatePassword(String username, String passwordHash);
     record Account(String username, String passwordHash) { }
 }

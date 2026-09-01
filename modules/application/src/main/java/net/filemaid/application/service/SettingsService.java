@@ -120,6 +120,7 @@ public final class SettingsService {
         add(map, "system.timezone", "system", Type.TIMEZONE, "Asia/Shanghai", false, false, 0, 0);
         add(map, "system.logLevel", "system", Type.ENUM, "INFO", false, false, 0, 0, "ERROR", "WARN", "INFO", "DEBUG");
         add(map, "system.databaseBackupRetention", "system", Type.INTEGER, "7", false, false, 1, 365);
+        add(map, "notification.webhookUrl", "notification", Type.URI, "", false, false, 0, 0);
         Set<String> runtimeKeys = Set.of(
                 "network.proxyType", "network.proxyHost", "network.proxyPort", "network.proxyUsername", "network.proxyPassword",
                 "network.timeoutSeconds", "network.retryCount", "provider.tmdb.enabled", "provider.tmdb.apiKey", "provider.tmdb.endpoint",
@@ -128,7 +129,9 @@ public final class SettingsService {
                 "provider.anidb.enabled", "provider.anidb.endpoint", LANGUAGE_PRIORITY);
         runtimeKeys = new java.util.HashSet<>(runtimeKeys);
         runtimeKeys.addAll(Set.of("naming.seriesTemplate", "naming.movieTemplate", "naming.unknownTemplate", "scan.maxDepth", "scan.maxFiles",
-                "metadata.matchThreshold", "metadata.candidateLimit", "postprocess.generateNfo", "postprocess.downloadArtwork", "postprocess.artworkType", "files.defaultOperation"));
+                "metadata.matchThreshold", "metadata.candidateLimit", "postprocess.generateNfo", "postprocess.downloadArtwork", "postprocess.artworkType", "files.defaultOperation",
+                "naming.preset", "naming.titlePreference", "naming.unknownTitle", "scan.ignorePatterns", "scan.minimumFileSizeMb", "scan.extensions",
+                "files.conflictPolicy", "files.historyRetentionDays", "postprocess.cleanEmptyDirectories", "notification.webhookUrl"));
         runtimeKeys.forEach(key -> map.computeIfPresent(key, (ignored, value) -> new Definition(value.key(), value.category(), value.type(), value.defaultValue(), value.secret(), true, value.min(), value.max(), value.options())));
         return java.util.Collections.unmodifiableMap(map);
     }

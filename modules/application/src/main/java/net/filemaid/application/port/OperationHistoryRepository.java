@@ -1,5 +1,6 @@
 package net.filemaid.application.port;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import net.filemaid.core.model.OperationRecord;
@@ -12,4 +13,7 @@ public interface OperationHistoryRepository {
     List<OperationRecord> findAll();
 
     Optional<OperationRecord> findById(long id);
+
+    /** Deletes entries whose timestamp predates {@code cutoff}; returns the removed count. */
+    default int deleteOlderThan(Instant cutoff) { return 0; }
 }

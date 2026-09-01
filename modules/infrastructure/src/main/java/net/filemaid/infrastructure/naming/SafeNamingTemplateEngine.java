@@ -19,11 +19,18 @@ public final class SafeNamingTemplateEngine implements NamingTemplateEngine {
     private final String seriesTemplate;
     private final String movieTemplate;
     private final String unknownTemplate;
+    private final String unknownTitle;
 
     public SafeNamingTemplateEngine(String seriesTemplate, String movieTemplate, String unknownTemplate) {
+        this(seriesTemplate, movieTemplate, unknownTemplate, null);
+    }
+
+    public SafeNamingTemplateEngine(String seriesTemplate, String movieTemplate, String unknownTemplate, String unknownTitle) {
         this.seriesTemplate = valueOrDefault(seriesTemplate, DEFAULT_SERIES);
         this.movieTemplate = valueOrDefault(movieTemplate, DEFAULT_MOVIE);
         this.unknownTemplate = valueOrDefault(unknownTemplate, DEFAULT_UNKNOWN);
+        String fallbackTitle = sanitize(valueOrDefault(unknownTitle, "Unknown"));
+        this.unknownTitle = fallbackTitle.isEmpty() ? "Unknown" : fallbackTitle;
         validateTemplate(this.seriesTemplate); validateTemplate(this.movieTemplate); validateTemplate(this.unknownTemplate);
     }
 
@@ -60,6 +67,7 @@ public final class SafeNamingTemplateEngine implements NamingTemplateEngine {
         values.put("title", safe(media.title()));
         values.put("year", media.year() == null ? "" : media.year().toString());
         values.put("season", media.season() == null ? "" : media.season().toString());
+        values.put("episode", media.episodes().isEmpty() ? "" : media.episodes().get(0).toString());
         values.put("episodes", episodeCode(media));
         values.put("extension", safeExtension(media.extension()));
         values.put("original", safe(media.originalName()));
@@ -95,7 +103,8 @@ public final class SafeNamingTemplateEngine implements NamingTemplateEngine {
         return media.episodes().stream().map(value -> String.format(Locale.ROOT, "E%02d", value)).reduce("", String::concat);
     }
     private String pad(String value, int width) { try { return String.format(Locale.ROOT, "%0" + width + "d", Integer.parseInt(value)); } catch (NumberFormatException ignored) { return value; } }
-    private String safe(String value) { String cleaned = value == null ? "" : value.replaceAll("[\\\\/:*?\"<>|]", " ").replaceAll("\\s+", " ").trim(); return cleaned.isEmpty() ? "Unknown" : cleaned; }
+    private String safe(String value) { String cleaned = sanitize(value); return cleaned.isEmpty() ? unknownTitle : cleaned; }
+    private static String sanitize(String value) { return (value == null ? "" : value).replaceAll("[\\\\/:*?\"<>|]", " ").replaceAll("\\s+", " ").trim(); }
     private String safeExtension(String value) { return value == null ? "" : value.replaceAll("[^.A-Za-z0-9]", ""); }
     private String valueOrDefault(String value, String fallback) { return value == null || value.isBlank() ? fallback : value.trim(); }
     private void validateTemplate(String template) {
@@ -106,7 +115,7 @@ public final class SafeNamingTemplateEngine implements NamingTemplateEngine {
     }
 
     private static final java.util.Set<String> ALLOWED = java.util.Set.of(
-            "title", "year", "season", "episodes", "extension", "original",
+            "title", "year", "season", "episode", "episodes", "extension", "original",
             "resolution", "videoCodec", "videoProfile", "audioCodec", "audioLanguage",
             "subtitleCodec", "subtitleLanguage", "width", "height", "frameRate",
             "bitRate", "duration", "fileSize");

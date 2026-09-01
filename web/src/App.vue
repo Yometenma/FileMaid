@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api, type MediaFile, type Preview, type Root } from './api'
 import { Clock, Files, FolderOpened, Moon, MoreFilled, Operation, Refresh, Search, Setting, Sunny, Warning } from '@element-plus/icons-vue'
@@ -8,7 +8,17 @@ import DirectoryBrowser from './DirectoryBrowser.vue'
 
 type Page = 'organize' | 'history' | 'settings'
 type Theme = 'system' | 'light' | 'dark'
-const page = ref<Page>('organize')
+function pageFromHash(): Page {
+  const h = window.location.hash.replace(/^#\/?/, '')
+  return h === 'history' ? 'history' : h === 'settings' ? 'settings' : 'organize'
+}
+function navigate(p: Page) {
+  if (page.value !== p) page.value = p
+  const target = '#/' + p
+  if (window.location.hash !== target) window.history.pushState(null, '', target)
+}
+window.addEventListener('hashchange', () => { page.value = pageFromHash() })
+const page = ref<Page>(pageFromHash())
 const theme = ref<Theme>((localStorage.getItem('filemaid-theme') as Theme) || 'system')
 const roots = ref<Root[]>([])
 const rootId = ref('')
@@ -16,6 +26,7 @@ const relativePath = ref('')
 const loading = ref(false)
 const message = ref('选择服务器目录，然后开始扫描')
 const previews = ref<Preview[]>([])
+const companions = ref<Record<string,{path:string;kind:string}[]>>({})
 const selected = ref<Preview[]>([])
 const operation = ref('MOVE')
 const directoryBrowserOpen = ref(false)
@@ -25,6 +36,8 @@ const validating = ref(false)
 const executing = ref(false)
 const confirmVisible = ref(false)
 const executionResults = ref<{source:string;target:string;success:boolean;error?:string}[]>([])
+type Task = { id:string; type:string; status:string; progress:number; message:string; error?:string; result?:any }
+const runningTasks = ref<Task[]>([])
 type Candidate = { provider:string;id:string;type:string;title:string;year?:number;overview?:string;artworkUrl?:string }
 const metadataDrawer = ref(false), metadataLoading = ref(false), metadataQuery = ref(''), metadataType = ref('SERIES')
 const metadataCandidates = ref<Candidate[]>([]), activeSource = ref(''), selections = ref<Record<string,any>>({})
@@ -33,6 +46,19 @@ const history = ref<HistoryItem[]>([]), historyLoading = ref(false), historyQuer
 const generateNfo=ref(false),downloadArtwork=ref(false),artworkType=ref('POSTER'),artworkUrls=ref<Record<string,string>>({})
 const candidateLimit=ref(10),matchThreshold=ref(.72)
 const filteredHistory = computed(() => history.value.filter(item => !historyQuery.value || `${item.source} ${item.target}`.toLowerCase().includes(historyQuery.value.toLowerCase())))
+const historyGroups = computed(() => {
+  const groups: { key: string; time: string; items: HistoryItem[] }[] = []
+  for (const item of filteredHistory.value) {
+    const last = groups[groups.length - 1]
+    if (last && Math.abs(new Date(last.time).getTime() - new Date(item.timestamp).getTime()) < 5000) {
+      last.items.push(item)
+    } else {
+      groups.push({ key: `${item.timestamp}-${item.id}`, time: item.timestamp, items: [item] })
+    }
+  }
+  return groups
+})
+const activeTasks = computed(() => runningTasks.value.filter(t => !['COMPLETED','FAILED','CANCELLED'].includes(t.status)))
 const themeIsDark = computed(() => theme.value === 'dark' || (theme.value === 'system' && matchMedia('(prefers-color-scheme: dark)').matches))
 
 function applyTheme() {
@@ -54,18 +80,69 @@ async function loadRoots() {
   } catch { message.value = '服务尚未连接，可先查看界面布局' }
 }
 
+function upsertTask(task: Task) {
+  const index = runningTasks.value.findIndex(item => item.id === task.id)
+  if (index >= 0) runningTasks.value[index] = task
+  else runningTasks.value.push(task)
+}
+
+async function pollTask(taskId: string): Promise<any> {
+  while (true) {
+    const task = await api<Task>(`/api/v1/tasks/${taskId}`)
+    upsertTask(task)
+    if (task.status === 'COMPLETED') return task.result
+    if (task.status === 'FAILED') throw new Error(task.error || '任务失败')
+    if (task.status === 'CANCELLED') throw new Error('任务已取消')
+    message.value = `${task.message}（${task.progress}%）`
+    await new Promise(resolve => setTimeout(resolve, 600))
+  }
+}
+
+async function cancelTask(id: string) {
+  try {
+    const task = await api<Task>(`/api/v1/tasks/${id}/cancel`, { method: 'POST' })
+    upsertTask(task)
+    ElMessage.warning('已请求取消任务')
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : '取消失败') }
+}
+
+let taskRefreshTimer: number | undefined
+function startTaskRefresh() {
+  stopTaskRefresh()
+  taskRefreshTimer = window.setInterval(async () => {
+    try {
+      const tasks = await api<Task[]>('/api/v1/tasks')
+      runningTasks.value = tasks.filter(t => !['COMPLETED','FAILED','CANCELLED'].includes(t.status))
+    } catch { /* 忽略轮询失败 */ }
+  }, 3000)
+}
+function stopTaskRefresh() {
+  if (taskRefreshTimer) { clearInterval(taskRefreshTimer); taskRefreshTimer = undefined }
+}
+
 async function scan() {
   if (!rootId.value) return
   loading.value = true
-  message.value = '正在扫描并生成目标路径…'
+  message.value = '正在提交扫描任务…'
   try {
-    const path = encodeURIComponent(relativePath.value.trim())
-    const files = await api<MediaFile[]>(`/api/v1/roots/${encodeURIComponent(rootId.value)}/scan?path=${path}`)
-    const media = files.filter(file => ['VIDEO', 'SUBTITLE'].includes(file.kind))
-    previews.value = media.length ? await api<Preview[]>('/api/v1/rename-plans/preview', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths: media.map(file => file.path) })
+    const { taskId } = await api<{taskId:string}>(`/api/v1/roots/${encodeURIComponent(rootId.value)}/scan`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: relativePath.value.trim() })
+    })
+    const files = await pollTask(taskId) as MediaFile[]
+    const groups = await api<any[]>('/api/v1/media/groups/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paths: files.map(f => f.path) }) })
+    const companionMap: Record<string,{path:string;kind:string}[]> = {}
+    for (const group of groups) {
+      for (const member of group.members) {
+        if (member.companionOf) (companionMap[member.companionOf] ||= []).push({ path: member.path, kind: member.kind })
+      }
+    }
+    companions.value = companionMap
+    const videoPaths = files.filter(file => file.kind === 'VIDEO').map(file => file.path)
+    previews.value = videoPaths.length ? await api<Preview[]>('/api/v1/rename-plans/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths: videoPaths })
     }) : []
     message.value = `扫描完成，共生成 ${previews.value.length} 条整理预览`
+    persistDraft()
   } catch (error) { message.value = error instanceof Error ? error.message : '扫描失败' }
   finally { loading.value = false }
 }
@@ -101,7 +178,31 @@ async function autoMatch() {
 
 function selectionChanged(rows: Preview[]) { selected.value = rows }
 function invalidatePlan() { confirmationToken.value=''; validationProblems.value=[] }
-function operations() { return selected.value.map(row => ({ source:row.source, target:row.target, type:operation.value })) }
+const batchEditVisible = ref(false), batchFind = ref(''), batchReplace = ref('')
+function openBatchEdit() {
+  if (!selected.value.length) { ElMessage.warning('请先选择要编辑的文件'); return }
+  batchFind.value = ''; batchReplace.value = ''
+  batchEditVisible.value = true
+}
+function applyBatchEdit() {
+  const find = batchFind.value
+  if (!find) { ElMessage.warning('请输入要查找的内容'); return }
+  selected.value.forEach(row => { row.target = row.target.split(find).join(batchReplace.value) })
+  invalidatePlan()
+  batchEditVisible.value = false
+  ElMessage.success(`已应用到 ${selected.value.length} 项`)
+}
+function operations() {
+  const ops = selected.value.map(row => ({ source:row.source, target:row.target, type:operation.value }))
+  for (const row of selected.value) {
+    for (const comp of companions.value[row.source] || []) {
+      const videoDir = row.target.includes('/') ? row.target.slice(0, row.target.lastIndexOf('/')) : ''
+      const compName = comp.path.split('/').pop() || comp.path
+      ops.push({ source: comp.path, target: (videoDir ? videoDir + '/' : '') + compName, type: operation.value })
+    }
+  }
+  return ops
+}
 async function validateSelected() {
   if (!selected.value.length) return
   validating.value=true; invalidatePlan()
@@ -122,8 +223,9 @@ async function executeSelected() {
   if(!confirmationToken.value)return
   executing.value=true
   try {
-    executionResults.value=await api('/api/v1/rename-plans/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmationToken:confirmationToken.value})})
+    const { taskId } = await api<{taskId:string}>('/api/v1/rename-plans/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmationToken:confirmationToken.value})})
     confirmVisible.value=false; confirmationToken.value=''
+    executionResults.value = await pollTask(taskId)
     const failed=executionResults.value.filter(item=>!item.success).length
     ElMessage[failed?'warning':'success'](failed?`执行完成，${failed} 项失败`:'整理完成')
     await scan()
@@ -133,26 +235,95 @@ function statusOf(row: Preview) { return row.warnings.length ? '待确认' : '�
 function themeTitle() { return theme.value === 'system' ? '跟随系统' : theme.value === 'light' ? '浅色模式' : '深色模式' }
 async function loadHistory(){historyLoading.value=true;try{history.value=await api('/api/v1/operations')}catch(error){ElMessage.error(error instanceof Error?error.message:'历史加载失败')}finally{historyLoading.value=false}}
 async function logout(){try{await api('/api/v1/auth/logout',{method:'POST'})}finally{location.reload()}}
+const changePasswordVisible = ref(false), currentPassword = ref(''), newPassword = ref(''), confirmPassword = ref(''), changingPassword = ref(false)
+async function submitChangePassword() {
+  if (newPassword.value !== confirmPassword.value) { ElMessage.warning('两次输入的新密码不一致'); return }
+  if (newPassword.value.length < 12) { ElMessage.warning('新密码至少 12 个字符'); return }
+  changingPassword.value = true
+  try {
+    await api('/api/v1/auth/change-password', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ currentPassword: currentPassword.value, newPassword: newPassword.value }) })
+    ElMessage.success('密码已修改')
+    changePasswordVisible.value = false
+    currentPassword.value = ''; newPassword.value = ''; confirmPassword.value = ''
+  } catch (error) { ElMessage.error(error instanceof Error ? error.message : '修改失败') }
+  finally { changingPassword.value = false }
+}
 async function undo(item:HistoryItem){try{const result=await api<{success:boolean;error?:string}>(`/api/v1/operations/${item.id}/undo?rootId=${encodeURIComponent(rootId.value)}`,{method:'POST'});result.success?ElMessage.success('撤销完成'):ElMessage.warning(result.error||'无法撤销');await loadHistory()}catch(error){ElMessage.error(error instanceof Error?error.message:'撤销失败')}}
 
-onMounted(async() => { applyTheme(); loadRoots();try{const settings=await api<Record<string,string>>('/api/v1/settings');generateNfo.value=settings['postprocess.generateNfo']==='true';downloadArtwork.value=settings['postprocess.downloadArtwork']==='true';artworkType.value=settings['postprocess.artworkType']||'POSTER';operation.value=settings['files.defaultOperation']||'MOVE';candidateLimit.value=Number(settings['metadata.candidateLimit'])||10;matchThreshold.value=Number(settings['metadata.matchThreshold'])||.72}catch{} })
+const DRAFT_KEY = 'filemaid-draft'
+window.addEventListener('storage', (event) => {
+  if (event.key === DRAFT_KEY) ElMessage.warning('检测到其他标签页修改了整理草稿，可刷新加载最新内容')
+})
+
+function persistDraft() {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      rootId: rootId.value,
+      relativePath: relativePath.value,
+      operation: operation.value,
+      previews: previews.value.map(p => ({ source: p.source, target: p.target, media: p.media, warnings: p.warnings })),
+      selections: selections.value,
+      artworkUrls: artworkUrls.value,
+      generateNfo: generateNfo.value,
+      downloadArtwork: downloadArtwork.value,
+      artworkType: artworkType.value
+    }))
+  } catch { /* 忽略存储失败 */ }
+}
+
+function restoreDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return
+    const draft = JSON.parse(raw)
+    if (draft.rootId && roots.value.some(r => r.id === draft.rootId)) rootId.value = draft.rootId
+    if (draft.relativePath != null) relativePath.value = draft.relativePath
+    if (draft.operation) operation.value = draft.operation
+    if (Array.isArray(draft.previews) && draft.previews.length) previews.value = draft.previews
+    if (draft.selections) selections.value = draft.selections
+    if (draft.artworkUrls) artworkUrls.value = draft.artworkUrls
+    if (draft.generateNfo != null) generateNfo.value = draft.generateNfo
+    if (draft.downloadArtwork != null) downloadArtwork.value = draft.downloadArtwork
+    if (draft.artworkType) artworkType.value = draft.artworkType
+    if (draft.previews?.length) message.value = '已恢复上次的整理草稿'
+  } catch { /* 忽略恢复失败 */ }
+}
+
+watch([previews, selections, relativePath, operation, artworkUrls, generateNfo, downloadArtwork, artworkType], persistDraft, { deep: true })
+
+onMounted(async() => {
+  applyTheme()
+  await loadRoots()
+  try {
+    const settings = await api<Record<string,string>>('/api/v1/settings')
+    generateNfo.value = settings['postprocess.generateNfo']==='true'
+    downloadArtwork.value = settings['postprocess.downloadArtwork']==='true'
+    artworkType.value = settings['postprocess.artworkType']||'POSTER'
+    operation.value = settings['files.defaultOperation']||'MOVE'
+    candidateLimit.value = Number(settings['metadata.candidateLimit'])||10
+    matchThreshold.value = Number(settings['metadata.matchThreshold'])||.72
+  } catch {}
+  restoreDraft()
+  startTaskRefresh()
+})
+onUnmounted(stopTaskRefresh)
 watch(page,value=>{if(value==='history')loadHistory()})
 </script>
 
 <template>
   <div class="app-shell">
     <header class="topbar">
-      <button class="brand" @click="page = 'organize'" aria-label="返回整理页">
+      <button class="brand" @click="navigate('organize')" aria-label="返回整理页">
         <span class="brand-mark"><Files /></span><span>FileMaid</span>
       </button>
       <nav class="main-nav" aria-label="主导航">
-        <button :class="{ active: page === 'organize' }" @click="page = 'organize'"><Operation />整理</button>
-        <button :class="{ active: page === 'history' }" @click="page = 'history'"><Clock />历史</button>
-        <button :class="{ active: page === 'settings' }" @click="page = 'settings'"><Setting />设置</button>
+        <button :class="{ active: page === 'organize' }" @click="navigate('organize')"><Operation />整理</button>
+        <button :class="{ active: page === 'history' }" @click="navigate('history')"><Clock />历史</button>
+        <button :class="{ active: page === 'settings' }" @click="navigate('settings')"><Setting />设置</button>
       </nav>
       <div class="top-actions">
         <span class="service-status"><i></i>服务正常</span>
-        <el-tooltip :content="themeTitle()"><button class="icon-button" @click="cycleTheme"><Moon v-if="themeIsDark" /><Sunny v-else /></button></el-tooltip><el-button text @click="logout">退出</el-button>
+        <el-tooltip :content="themeTitle()"><button class="icon-button" @click="cycleTheme"><Moon v-if="themeIsDark" /><Sunny v-else /></button></el-tooltip><el-button text @click="changePasswordVisible=true">修改密码</el-button><el-button text @click="logout">退出</el-button>
       </div>
     </header>
 
@@ -169,6 +340,15 @@ watch(page,value=>{if(value==='history')loadHistory()})
         <el-button type="primary" :loading="loading" @click="scan"><Search />扫描目录</el-button>
       </section>
 
+      <section v-if="activeTasks.length" class="task-strip surface">
+        <div v-for="task in activeTasks" :key="task.id" class="task-item">
+          <span class="task-type">{{ task.type }}</span>
+          <el-progress :percentage="task.progress" :status="task.status==='FAILED'?'exception':undefined" :stroke-width="6" style="flex:1;min-width:120px" />
+          <span class="task-message">{{ task.message }}</span>
+          <el-button v-if="task.status==='PENDING'||task.status==='RUNNING'" size="small" @click="cancelTask(task.id)">取消</el-button>
+        </div>
+      </section>
+
       <section class="status-strip">
         <span><Refresh :class="{ spin: loading }" />{{ message }}</span>
         <div><span><i class="legend ready"></i>{{ previews.filter(p => !p.warnings.length).length }} 可执行</span><span><i class="legend warn"></i>{{ previews.filter(p => p.warnings.length).length }} 待确认</span></div>
@@ -177,10 +357,21 @@ watch(page,value=>{if(value==='history')loadHistory()})
       <section class="table-card surface">
         <div class="table-toolbar">
           <div><h2>路径对照</h2><span>源文件和整理后的目标位置</span></div>
-          <div class="toolbar-actions"><el-button :loading="metadataLoading" :disabled="!previews.length" @click="autoMatch">自动匹配</el-button><el-button disabled>批量编辑</el-button><el-button text><MoreFilled /></el-button></div>
+          <div class="toolbar-actions"><el-button :loading="metadataLoading" :disabled="!previews.length" @click="autoMatch">自动匹配</el-button><el-button :disabled="!selected.length" @click="openBatchEdit">批量编辑</el-button><el-button text><MoreFilled /></el-button></div>
         </div>
         <el-table :data="previews" class="compare-table" height="calc(100vh - 390px)" empty-text="扫描目录后，这里会显示源文件与新文件名" @selection-change="selectionChanged">
           <el-table-column type="selection" width="48" />
+          <el-table-column type="expand" width="40">
+            <template #default="{ row }">
+              <div v-if="companions[row.source]?.length" class="companion-list">
+                <div v-for="comp in companions[row.source]" :key="comp.path" class="companion-item">
+                  <span class="companion-kind">{{ comp.kind }}</span>
+                  <span>{{ comp.path.split('/').pop() }}</span>
+                  <small>跟随视频一起{{ operation==='MOVE'?'移动':operation==='COPY'?'复制':'链接' }}</small>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column label="源文件" min-width="310"><template #default="{ row }"><button class="path-cell path-button" @click="openMatch(row)"><span class="file-icon"><Files /></span><div><strong>{{ row.source.split('/').pop() }}</strong><small>{{ row.source.includes('/') ? row.source.slice(0, row.source.lastIndexOf('/')) : '根目录' }}</small></div></button></template></el-table-column>
           <el-table-column width="54" align="center"><template #default><span class="route-arrow">→</span></template></el-table-column>
           <el-table-column label="新文件名" min-width="370"><template #default="{ row }"><div class="target-cell"><el-input v-model="row.target" @input="invalidatePlan"/><small>{{ row.media.title }}<template v-if="row.media.season != null"> · 第 {{ row.media.season }} 季</template></small></div></template></el-table-column>
@@ -198,6 +389,22 @@ watch(page,value=>{if(value==='history')loadHistory()})
         <div class="confirm-summary"><strong>即将{{ operation==='MOVE'?'移动':operation==='COPY'?'复制':'创建硬链接' }} {{ selected.length }} 个文件</strong><p>执行前服务器会再次检查源文件、目标冲突和路径安全，默认不会覆盖已有文件。</p><ul><li v-for="row in selected.slice(0,5)" :key="row.source">{{ row.source }} → {{ row.target }}</li></ul><small v-if="selected.length>5">另外还有 {{ selected.length-5 }} 项</small></div>
         <template #footer><el-button @click="confirmVisible=false">取消</el-button><el-button type="primary" :loading="executing" @click="executeSelected">确认执行</el-button></template>
       </el-dialog>
+      <el-dialog v-model="changePasswordVisible" width="420px" title="修改密码">
+        <div class="password-form">
+          <el-input v-model="currentPassword" type="password" show-password placeholder="当前密码" />
+          <el-input v-model="newPassword" type="password" show-password placeholder="新密码（至少 12 位）" />
+          <el-input v-model="confirmPassword" type="password" show-password placeholder="确认新密码" />
+        </div>
+        <template #footer><el-button @click="changePasswordVisible=false">取消</el-button><el-button type="primary" :loading="changingPassword" @click="submitChangePassword">确认修改</el-button></template>
+      </el-dialog>
+      <el-dialog v-model="batchEditVisible" width="480px" title="批量编辑目标路径">
+        <div class="batch-edit-form">
+          <p>对已选 {{ selected.length }} 项的目标路径做查找替换：</p>
+          <el-input v-model="batchFind" placeholder="查找内容（如：Episode）" />
+          <el-input v-model="batchReplace" placeholder="替换为（留空则删除）" />
+        </div>
+        <template #footer><el-button @click="batchEditVisible=false">取消</el-button><el-button type="primary" @click="applyBatchEdit">应用</el-button></template>
+      </el-dialog>
       <el-drawer v-model="metadataDrawer" size="460px" title="选择元数据">
         <div class="metadata-search"><el-input v-model="metadataQuery" placeholder="输入标题" @keyup.enter="searchMetadata"><template #prefix><Search/></template></el-input><el-button type="primary" :loading="metadataLoading" @click="searchMetadata">搜索</el-button></div>
         <p class="drawer-source">应用到：{{ activeSource }}</p>
@@ -211,15 +418,30 @@ watch(page,value=>{if(value==='history')loadHistory()})
     <main v-else-if="page === 'history'" class="page secondary-page">
       <section class="page-heading"><div><p class="eyebrow">操作记录</p><h1>整理历史</h1><p>按批次查看结果，并在目标路径仍然安全时撤销。</p></div></section>
       <section class="history-card surface">
-        <div class="table-toolbar"><div><h2>操作记录</h2><span>共 {{ filteredHistory.length }} 条</span></div><el-input v-model="historyQuery" clearable placeholder="搜索源路径或目标路径" style="width:300px"><template #prefix><Search/></template></el-input></div>
-        <el-table :data="filteredHistory" v-loading="historyLoading" empty-text="还没有整理记录">
-          <el-table-column label="时间" width="180"><template #default="{row}">{{ new Date(row.timestamp).toLocaleString() }}</template></el-table-column>
-          <el-table-column prop="type" label="操作" width="100" />
-          <el-table-column label="源文件" min-width="250"><template #default="{row}"><span class="history-path">{{ row.source }}</span></template></el-table-column>
-          <el-table-column label="目标文件" min-width="250"><template #default="{row}"><span class="history-path">{{ row.target }}</span></template></el-table-column>
-          <el-table-column label="结果" width="100"><template #default="{row}"><span class="row-status" :class="row.success?'success':'warning'">{{ row.success?'成功':'失败' }}</span></template></el-table-column>
-          <el-table-column label="操作" width="90"><template #default="{row}"><el-button text type="primary" :disabled="!row.success" @click="undo(row)">撤销</el-button></template></el-table-column>
-        </el-table>
+        <div class="table-toolbar"><div><h2>操作记录</h2><span>共 {{ historyGroups.length }} 批 · {{ filteredHistory.length }} 条</span></div><el-input v-model="historyQuery" clearable placeholder="搜索源路径或目标路径" style="width:300px"><template #prefix><Search/></template></el-input></div>
+        <div class="history-batches" v-loading="historyLoading">
+          <div v-if="!historyGroups.length" class="directory-empty">还没有整理记录</div>
+          <el-collapse v-else>
+            <el-collapse-item v-for="group in historyGroups" :key="group.key">
+              <template #title>
+                <div class="batch-title">
+                  <strong>{{ new Date(group.time).toLocaleString() }}</strong>
+                  <span class="row-status" :class="group.items.every(i=>i.success)?'success':'warning'">{{ group.items.filter(i=>i.success).length }}/{{ group.items.length }} 成功</span>
+                  <small>{{ group.items.length }} 项 · {{ group.items.map(i=>i.type).filter((v,i,a)=>a.indexOf(v)===i).join('、') }}</small>
+                </div>
+              </template>
+              <div class="batch-items">
+                <div v-for="item in group.items" :key="item.id" class="batch-item">
+                  <span class="history-path">{{ item.source }}</span>
+                  <span class="route-arrow">→</span>
+                  <span class="history-path">{{ item.target }}</span>
+                  <span class="row-status" :class="item.success?'success':'warning'">{{ item.type }} · {{ item.success?'成功':'失败' }}</span>
+                  <el-button text type="primary" size="small" :disabled="!item.success" @click="undo(item)">撤销</el-button>
+                </div>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
       </section>
     </main>
 

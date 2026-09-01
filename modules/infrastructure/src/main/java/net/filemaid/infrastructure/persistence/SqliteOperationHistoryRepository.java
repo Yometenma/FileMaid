@@ -108,6 +108,18 @@ public final class SqliteOperationHistoryRepository implements OperationHistoryR
         }
     }
 
+    @Override
+    public int deleteOlderThan(Instant cutoff) {
+        if (cutoff == null) return 0;
+        String sql = "DELETE FROM operation_history WHERE timestamp < ?";
+        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, cutoff.toString());
+            return statement.executeUpdate();
+        } catch (Exception failure) {
+            throw new IllegalStateException("Failed to clean up operation history", failure);
+        }
+    }
+
     private OperationRecord map(ResultSet resultSet) throws Exception {
         return new OperationRecord(
                 resultSet.getLong("id"),

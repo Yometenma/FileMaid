@@ -1,6 +1,7 @@
 package net.filemaid.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -68,7 +69,20 @@ class RenameExecutePostProcessTest {
                         .content("{\"confirmationToken\":\"" + token + "\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
-        JsonNode results = objectMapper.readTree(executeResult.getResponse().getContentAsString());
+        String taskId = objectMapper.readTree(executeResult.getResponse().getContentAsString()).get("taskId").asText();
+
+        JsonNode results = null;
+        for (int i = 0; i < 100 && results == null; i++) {
+            MvcResult taskResult = mvc.perform(get("/api/v1/tasks/" + taskId))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode task = objectMapper.readTree(taskResult.getResponse().getContentAsString());
+            String status = task.get("status").asText();
+            if ("COMPLETED".equals(status)) results = task.get("result");
+            else if ("FAILED".equals(status) || "CANCELLED".equals(status)) break;
+            else Thread.sleep(50);
+        }
+        assertThat(results).isNotNull();
         assertThat(results.size()).isEqualTo(2);
         assertThat(results.get(0).get("type").asText()).isEqualTo("MOVE");
         assertThat(results.get(0).get("success").asBoolean()).isTrue();

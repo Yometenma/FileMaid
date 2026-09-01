@@ -11,6 +11,7 @@ import net.filemaid.application.port.MatchDecisionRepository;
 import net.filemaid.application.port.OperationHistoryRepository;
 import net.filemaid.application.port.SettingsRepository;
 import net.filemaid.application.port.StorageBrowser;
+import net.filemaid.application.port.TaskRepository;
 import net.filemaid.application.port.MediaPostProcessor;
 import net.filemaid.application.port.UserAccountRepository;
 import net.filemaid.application.service.ParseMediaNameService;
@@ -44,6 +45,7 @@ import net.filemaid.infrastructure.metadata.TvdbHttpMetadataProvider;
 import net.filemaid.infrastructure.naming.SafeNamingTemplateEngine;
 import net.filemaid.infrastructure.persistence.SqliteMatchDecisionRepository;
 import net.filemaid.infrastructure.persistence.SqliteOperationHistoryRepository;
+import net.filemaid.infrastructure.persistence.InMemoryTaskRepository;
 import net.filemaid.infrastructure.persistence.SqliteSettingsRepository;
 import net.filemaid.infrastructure.postprocess.LocalMediaPostProcessor;
 import net.filemaid.infrastructure.persistence.SqliteUserAccountRepository;
@@ -63,23 +65,24 @@ public class ApplicationConfiguration {
     @Bean NamingTemplateEngine namingTemplateEngine(FileMaidProperties properties, SettingsService settings) { return new RuntimeNamingTemplateEngine(properties, settings); }
     @Bean RenamePreviewService renamePreviewService(MediaNameParser parser, NamingTemplateEngine naming, ProbeMediaInfoService probeService) { return new RenamePreviewService(parser, naming, probeService); }
     @Bean BuildRenamePlanService buildRenamePlanService(RenamePreviewService previewService) { return new BuildRenamePlanService(previewService); }
-    @Bean ValidateRenamePlanService validateRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy) {
-        return new ValidateRenamePlanService(storageRoots(properties), pathPolicy);
+    @Bean ValidateRenamePlanService validateRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy, SettingsService settings) {
+        return new ValidateRenamePlanService(storageRoots(properties), pathPolicy, settings);
     }
     @Bean OperationHistoryRepository operationHistoryRepository(FileMaidProperties properties) { return new SqliteOperationHistoryRepository(properties.dbPath()); }
-    @Bean OperationHistoryService operationHistoryService(OperationHistoryRepository repository) { return new OperationHistoryService(repository); }
+    @Bean OperationHistoryService operationHistoryService(OperationHistoryRepository repository, SettingsService settings) { return new OperationHistoryService(repository, settings); }
     @Bean UndoService undoService(FileMaidProperties properties, StoragePathPolicy pathPolicy, OperationHistoryRepository history) {
         return new UndoService(storageRoots(properties), pathPolicy, history);
     }
-    @Bean ExecuteRenamePlanService executeRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy, OperationHistoryRepository history) {
-        return new ExecuteRenamePlanService(storageRoots(properties), pathPolicy, history);
+    @Bean ExecuteRenamePlanService executeRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy, OperationHistoryRepository history, SettingsService settings) {
+        return new ExecuteRenamePlanService(storageRoots(properties), pathPolicy, history, settings);
     }
     @Bean SettingsRepository settingsRepository(FileMaidProperties properties) { return new SqliteSettingsRepository(properties.dbPath()); }
+    @Bean TaskRepository taskRepository() { return new InMemoryTaskRepository(); }
     @Bean UserAccountRepository userAccountRepository(FileMaidProperties properties) { return new SqliteUserAccountRepository(properties.dbPath()); }
     @Bean SettingsService settingsService(SettingsRepository repository) { return new SettingsService(repository); }
     @Bean MediaPostProcessor mediaPostProcessor() { return new LocalMediaPostProcessor(); }
-    @Bean PostProcessMediaService postProcessMediaService(FileMaidProperties properties, StoragePathPolicy policy, MediaPostProcessor processor, OperationHistoryRepository history) {
-        return new PostProcessMediaService(storageRoots(properties), policy, processor, history);
+    @Bean PostProcessMediaService postProcessMediaService(FileMaidProperties properties, StoragePathPolicy policy, MediaPostProcessor processor, OperationHistoryRepository history, SettingsService settings) {
+        return new PostProcessMediaService(storageRoots(properties), policy, processor, history, settings);
     }
     @Bean SearchMetadataService searchMetadataService(List<MetadataProvider> providers, SettingsService settings) { return new SearchMetadataService(providers, settings::languagePriority); }
     @Bean SimilarityRanker similarityRanker() { return new BuiltinSimilarityRanker(); }
@@ -91,8 +94,8 @@ public class ApplicationConfiguration {
     @Bean ProbeMediaInfoService probeMediaInfoService(FileMaidProperties properties, StoragePathPolicy pathPolicy, MediaInfoProvider provider) {
         return new ProbeMediaInfoService(storageRoots(properties), pathPolicy, provider);
     }
-    @Bean ScanMediaService scanMediaService(FileMaidProperties properties, MediaScanner scanner, StoragePathPolicy pathPolicy) {
-        return new ScanMediaService(storageRoots(properties), scanner, pathPolicy);
+    @Bean ScanMediaService scanMediaService(FileMaidProperties properties, MediaScanner scanner, StoragePathPolicy pathPolicy, SettingsService settings) {
+        return new ScanMediaService(storageRoots(properties), scanner, pathPolicy, settings);
     }
 
     @Bean MetadataProvider tmdbMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("tmdb", properties, settings); }

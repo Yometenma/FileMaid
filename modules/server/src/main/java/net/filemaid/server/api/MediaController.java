@@ -22,6 +22,7 @@ import net.filemaid.core.model.PostProcessPlan;
 import net.filemaid.core.model.RenameOperation;
 import net.filemaid.core.model.RenamePlan;
 import net.filemaid.core.model.RenamePreview;
+import net.filemaid.server.BackgroundTaskService;
 import net.filemaid.server.ConfirmedPlanRegistry;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,11 +40,13 @@ public class MediaController {
     private final ExecuteRenamePlanService executePlanService;
     private final PostProcessMediaService postProcessService;
     private final ConfirmedPlanRegistry confirmedPlans;
+    private final BackgroundTaskService taskService;
 
     public MediaController(ParseMediaNameService parseService, RenamePreviewService previewService,
             AnalyzeMediaGroupsService groupService, BuildRenamePlanService buildPlanService,
             ValidateRenamePlanService validatePlanService, ExecuteRenamePlanService executePlanService,
-            PostProcessMediaService postProcessService, ConfirmedPlanRegistry confirmedPlans) {
+            PostProcessMediaService postProcessService, ConfirmedPlanRegistry confirmedPlans,
+            BackgroundTaskService taskService) {
         this.parseService = parseService;
         this.previewService = previewService;
         this.groupService = groupService;
@@ -52,6 +55,7 @@ public class MediaController {
         this.executePlanService = executePlanService;
         this.postProcessService = postProcessService;
         this.confirmedPlans = confirmedPlans;
+        this.taskService = taskService;
     }
 
     @PostMapping("/media/groups/analyze")
@@ -88,11 +92,17 @@ public class MediaController {
     }
 
     @PostMapping("/rename-plans/execute")
-    List<OperationResult> executePlan(@Valid @RequestBody ExecuteRequest request) {
+    ExecuteTaskResponse executePlan(@Valid @RequestBody ExecuteRequest request) {
         var plan = confirmedPlans.consume(request.confirmationToken());
         var validation = validatePlanService.validate(plan.rootId(), plan.operations());
         if (!validation.valid()) throw new IllegalArgumentException(String.join("；", validation.problems()));
+        String taskId = taskService.submit("EXECUTE", "正在整理…", context -> executeConfirmed(plan, context));
+        return new ExecuteTaskResponse(taskId);
+    }
+
+    private List<OperationResult> executeConfirmed(ConfirmedPlanRegistry.ConfirmedPlan plan, net.filemaid.server.TaskContext context) {
         List<OperationResult> results = new ArrayList<>(executePlanService.execute(plan.rootId(), plan.operations()));
+        context.progress(70, "文件操作完成，执行后处理");
         PostProcessPlan postProcess = plan.postProcess();
         if (postProcess != null && postProcess.enabled()) {
             Map<String, String> targetBySource = results.stream()
@@ -116,6 +126,7 @@ public class MediaController {
     public record ExecuteRequest(UUID confirmationToken) {
         public ExecuteRequest { if (confirmationToken == null) throw new IllegalArgumentException("缺少确认令牌"); }
     }
+    public record ExecuteTaskResponse(String taskId) { }
     public record ConfirmedValidation(boolean valid, List<String> problems, UUID confirmationToken) { }
     private void requireFileOperation(RenameOperation.OperationType type) {
         if (type == RenameOperation.OperationType.NFO || type == RenameOperation.OperationType.ARTWORK) throw new IllegalArgumentException("后处理操作不能进入文件整理计划");
