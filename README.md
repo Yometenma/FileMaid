@@ -1,60 +1,137 @@
-# FileMaid
+<div align="center">
 
-FileMaid is a self-hosted media-file organizer. The project is currently in its read-only foundation phase: it can start an HTTP service, expose configured storage roots, and scan mounted directories without changing files.
+# FileMaid 🧹✨
 
-## Modules
+**自托管的媒体文件整理工具**
 
-- `core`: framework-free models and invariants.
-- `application`: use cases and ports.
-- `infrastructure`: filesystem and future database/provider adapters.
-- `server`: Spring Boot HTTP application.
-- `legacy-engine`: the existing media organization engine, isolated for gradual integration.
+![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)
+![Status](https://img.shields.io/badge/status-early%20development-ff69b4)
 
-See [docs/architecture.md](docs/architecture.md) and [AGENTS.md](AGENTS.md) for the current design and development status.
+</div>
 
-## Local verification
+FileMaid 运行在你自己的服务器上，通过 Web UI 帮你扫描媒体目录、解析文件名、匹配 TMDB 元数据，并预览电影、剧集、动漫和字幕的目标路径，以 Docker 作为首选部署方式。
 
-```powershell
-.\gradlew.bat :modules:application:test :modules:infrastructure:test :modules:server:test
-.\gradlew.bat :modules:server:bootRun
-```
+---
 
-To include the existing engine's season/episode matcher during local development:
+## ✨ 核心功能
 
-```powershell
-.\gradlew.bat :modules:server:bootRun -PwithLegacyEngine
-```
+| 功能 | 说明 |
+| --- | --- |
+| 🗂️ **浏览目录** | 只读浏览挂载的媒体目录 |
+| 🔍 **扫描识别** | 识别电影、剧集、动漫、字幕和关联文件 |
+| 🏷️ **解析文件名** | 从文件名提取标题、年份、季数、集数 |
+| 🎬 **元数据匹配** | 接入 TMDB，搜索候选并绑定到具体源文件 |
+| 📐 **命名预览** | 用模板生成电影 / 剧集 / 未分类的目标路径 |
+| 🔗 **媒体分组** | 自动把字幕关联到对应视频，孤立字幕会给出提醒 |
+| 🛡️ **安全边界** | 路径越界保护、只读根目录，服务器绝对路径不外泄 |
 
-The default media root is `./data/media`. Override it with `FILEMAID_MEDIA_ROOT`.
+## ⚠️ 当前状态：早期开发（只读）
 
-## HTTP API
+FileMaid 目前处于**只读预览**阶段，只会扫描和生成预览清单，**不会修改任何文件**。
 
-- `GET /api/v1/system/health`
-- `GET /api/v1/roots`
-- `GET /api/v1/roots/{rootId}/scan?path=relative/path`
-- `POST /api/v1/media/parse`
-- `POST /api/v1/media/groups/analyze`
-- `POST /api/v1/rename-plans/preview`
-- `GET /api/v1/metadata/providers`
-- `GET /api/v1/metadata/search`
-- `GET /api/v1/naming/templates`
-- `GET /actuator/health`
+重命名、移动、复制、硬链接、操作历史、撤销等功能都在路线图中，尚未上线。
+在此之前，你可以放心扫描、预览、核对匹配结果，不会弄乱你的媒体库。
 
-The current API is intentionally read-only.
+## 🚀 快速开始（Docker）
 
-## Docker
-
-Create `data/media`, place test media inside it, then run:
-
-```text
+```bash
+mkdir -p data/media   # 放入你的测试媒体文件
 docker compose up --build
 ```
 
-The example Compose file mounts the media directory read-only. Do not change it to read-write until preview, confirmation, journaling, and undo have been implemented.
-# TMDB 元数据搜索
+打开 <http://localhost:8080>，在网页工作台里选择根目录、扫描媒体、预览目标路径。
 
-启动时设置 `FILEMAID_TMDB_API_KEY`，Web 工作台即可搜索电影和剧集候选。带旧引擎构建会优先复用原有 TMDB 客户端，精简 Docker 构建则使用轻量兼容客户端。密钥不会写入源码；未配置时扫描和预览功能仍可正常使用。
+> 示例 Compose 会把媒体目录以**只读**方式挂载。在写操作功能上线之前，请保持只读。
 
-## 命名模板
+## ⚙️ 配置
 
-可通过 `FILEMAID_NAMING_SERIES`、`FILEMAID_NAMING_MOVIE`、`FILEMAID_NAMING_UNKNOWN` 覆盖默认模板。支持 `{title}`、`{year}`、`{season:02}`、`{episodes}`、`{extension}`、`{original}`。模板只生成媒体根目录内的相对路径，不执行 Groovy 或其他脚本。
+通过环境变量调整，`.env` 里定义的变量会被 `compose.yaml` 透传：
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `FILEMAID_PORT` | `8080` | HTTP 服务端口 |
+| `FILEMAID_MEDIA_ROOT` | `./data/media` | 媒体根目录（仅暴露根目录内相对路径） |
+| `FILEMAID_SCAN_MAX_DEPTH` | `16` | 扫描最大目录深度 |
+| `FILEMAID_SCAN_MAX_FILES` | `10000` | 单次扫描最大文件数 |
+| `FILEMAID_TMDB_API_KEY` | *(空)* | TMDB API 密钥，未配置时扫描与预览仍可用 |
+| `FILEMAID_NAMING_SERIES` | *(内置)* | 剧集命名模板 |
+| `FILEMAID_NAMING_MOVIE` | *(内置)* | 电影命名模板 |
+| `FILEMAID_NAMING_UNKNOWN` | *(内置)* | 未分类文件命名模板 |
+
+## 📐 命名模板
+
+模板只生成媒体根目录内的相对路径，**不执行 Groovy 或任何脚本**，绝对路径 / 越界 / 未知变量一律拒绝。
+
+| 类型 | 默认模板 |
+| --- | --- |
+| 剧集 | `TV Shows/{title}/Season {season:02}/{title} - S{season:02}{episodes}{extension}` |
+| 电影 | `Movies/{title} ({year})/{title} ({year}){extension}` |
+| 未分类 | `Unsorted/{original}` |
+
+可用变量：`{title}` · `{year}` · `{season:02}` · `{episodes}` · `{extension}` · `{original}`
+
+## 🔌 HTTP API
+
+当前 API 全部为只读，根路径 `/api/v1`：
+
+| 方法 & 路径 | 用途 |
+| --- | --- |
+| `GET /api/v1/system/health` | 服务健康检查 |
+| `GET /api/v1/roots` | 列出已配置的存储根目录 |
+| `GET /api/v1/roots/{rootId}/scan?path=` | 扫描根目录下的相对路径 |
+| `POST /api/v1/media/parse` | 解析文件名（`{ "names": [...] }`） |
+| `POST /api/v1/media/groups/analyze` | 媒体分组 + 字幕关联分析 |
+| `POST /api/v1/rename-plans/preview` | 生成改名预览（可携带已选元数据） |
+| `GET /api/v1/metadata/providers` | 元数据提供器状态 |
+| `GET /api/v1/metadata/search?query=&type=&locale=&limit=` | TMDB 候选搜索（`type` = `MOVIE` / `SERIES`） |
+| `GET /api/v1/naming/templates` | 查看当前生效的命名模板 |
+| `GET /actuator/health` | Spring Actuator 健康端点 |
+
+## 🛠️ 本地开发
+
+需要 JDK 17。旧引擎（601 个 `net.filemaid` 源文件）是独立兼容模块，通过适配器接入。
+
+```powershell
+# 运行测试
+.\gradlew.bat :modules:application:test :modules:infrastructure:test :modules:server:test
+
+# 启动服务（默认媒体根 ./data/media）
+.\gradlew.bat :modules:server:bootRun
+
+# 开发期启用旧引擎季集匹配器
+.\gradlew.bat :modules:server:bootRun -PwithLegacyEngine
+```
+
+## 🏗️ 项目结构
+
+模块化单体，依赖单向：`server → infrastructure → application → core`。
+
+| 模块 | 职责 |
+| --- | --- |
+| `core` | 无框架领域模型与约束 |
+| `application` | 用例、端口与流程编排 |
+| `infrastructure` | 文件系统、解析器、元数据与命名模板适配器 |
+| `server` | Spring Boot HTTP 服务与配置入口 |
+| `legacy-engine` | 现有整理引擎（隔离，通过适配器逐步接入） |
+
+## 🗺️ 路线图
+
+- [x] 只读扫描 / 解析 / 命名预览 / TMDB 匹配 / 媒体分组
+- [ ] 接入 FFprobe / 媒体信息（分辨率、编解码器、音轨字幕轨）
+- [ ] 执行写操作：重命名、移动、复制、硬链接（默认不覆盖）
+- [ ] 操作历史 + 任务日志 + 撤销
+- [ ] SQLite 持久化配置与匹配决策
+- [ ] Vue 3 前端 + 单用户登录与安全会话
+- [ ] 反向代理 / HTTPS 部署说明
+
+## 🔒 安全说明
+
+- 未经确认，不会对媒体目录执行任何写操作。
+- 所有输入路径都会规范化，并校验仍在允许的根目录内。
+- 改名预览与实际执行之间会重新校验源文件、目标与冲突（待实现）。
+- 密钥只通过环境变量注入，不写入源码或版本库。
+
+## 📜 License
+
+待定（TBD）。
