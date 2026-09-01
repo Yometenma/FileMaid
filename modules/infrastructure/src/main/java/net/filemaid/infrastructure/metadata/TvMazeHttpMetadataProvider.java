@@ -46,7 +46,7 @@ public final class TvMazeHttpMetadataProvider implements MetadataProvider {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(timeout).GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("TVMaze 请求失败（HTTP " + response.statusCode() + "）");
+            throw new MetadataHttpException("TVMaze", response.statusCode(), response.headers());
         }
         List<MetadataCandidate> values = new ArrayList<>();
         for (JsonNode item : json.readTree(response.body())) {

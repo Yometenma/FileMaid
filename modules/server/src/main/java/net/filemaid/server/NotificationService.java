@@ -1,11 +1,13 @@
 package net.filemaid.server;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import net.filemaid.application.service.SettingsService;
+import net.filemaid.core.model.Task;
 import org.springframework.stereotype.Service;
 
 /** Sends outbound notifications (webhook) for operational checks. */
@@ -33,6 +35,23 @@ public final class NotificationService {
         } catch (Exception failure) {
             return new NotificationResult(false, 0, failure.getMessage());
         }
+    }
+
+    public NotificationResult sendTaskCompletion(Task task) {
+        String url = settings.value(WEBHOOK_KEY, "").trim();
+        if (url.isBlank()) return new NotificationResult(false, 0, "未配置");
+        try {
+            String payload = new ObjectMapper().writeValueAsString(java.util.Map.of(
+                    "event", "filemaid.task.completed", "taskId", task.id(), "type", task.type(),
+                    "status", task.status().name(), "message", task.error() == null ? task.message() : task.error(),
+                    "completedAt", task.updatedAt().toString()));
+            HttpRequest request = HttpRequest.newBuilder(validateUrl(url)).timeout(Duration.ofSeconds(10))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(payload)).build();
+            HttpResponse<String> response = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
+                    .send(request, HttpResponse.BodyHandlers.ofString());
+            return new NotificationResult(response.statusCode() >= 200 && response.statusCode() < 300, response.statusCode(), null);
+        } catch (Exception failure) { return new NotificationResult(false, 0, failure.getMessage()); }
     }
 
     private URI validateUrl(String url) {

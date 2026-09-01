@@ -94,6 +94,7 @@ public final class SettingsService {
         add(map, "provider.tvdb.apiKey", "providers", Type.STRING, "", true, false, 0, 0);
         add(map, "provider.tvdb.pin", "providers", Type.STRING, "", true, false, 0, 0);
         add(map, "provider.omdb.apiKey", "providers", Type.STRING, "", true, false, 0, 0);
+        add(map, "provider.omdb.dailyLimit", "providers", Type.INTEGER, "1000", false, false, 0, 1_000_000);
         add(map, "provider.anidb.clientName", "providers", Type.STRING, "filemaid", false, false, 0, 0);
         add(map, "naming.preset", "naming", Type.ENUM, "JELLYFIN", false, false, 0, 0, "JELLYFIN", "EMBY", "PLEX", "CUSTOM");
         add(map, "naming.seriesTemplate", "naming", Type.TEMPLATE, "TV Shows/{title}/Season {season:02}/{title} - S{season:02}{episodes}{extension}", false, false, 0, 0);
@@ -125,7 +126,7 @@ public final class SettingsService {
                 "network.proxyType", "network.proxyHost", "network.proxyPort", "network.proxyUsername", "network.proxyPassword",
                 "network.timeoutSeconds", "network.retryCount", "provider.tmdb.enabled", "provider.tmdb.apiKey", "provider.tmdb.endpoint",
                 "provider.tvdb.enabled", "provider.tvdb.apiKey", "provider.tvdb.pin", "provider.tvdb.endpoint",
-                "provider.omdb.enabled", "provider.omdb.apiKey", "provider.omdb.endpoint", "provider.tvmaze.enabled", "provider.tvmaze.endpoint",
+                "provider.omdb.enabled", "provider.omdb.apiKey", "provider.omdb.endpoint", "provider.omdb.dailyLimit", "provider.tvmaze.enabled", "provider.tvmaze.endpoint",
                 "provider.anidb.enabled", "provider.anidb.endpoint", LANGUAGE_PRIORITY);
         runtimeKeys = new java.util.HashSet<>(runtimeKeys);
         runtimeKeys.addAll(Set.of("naming.seriesTemplate", "naming.movieTemplate", "naming.unknownTemplate", "scan.maxDepth", "scan.maxFiles",

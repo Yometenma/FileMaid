@@ -1,5 +1,6 @@
 services:
   filemaid:
+    image: ghcr.io/yometenma/filemaid:${FILEMAID_VERSION:-latest}
     build: .
     container_name: filemaid
     restart: unless-stopped

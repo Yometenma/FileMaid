@@ -58,7 +58,7 @@ public final class TvdbHttpMetadataProvider implements MetadataProvider {
                 .GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("TVDB 请求失败（HTTP " + response.statusCode() + "）");
+            throw new MetadataHttpException("TVDB", response.statusCode(), response.headers());
         }
         List<MetadataCandidate> values = new ArrayList<>();
         for (JsonNode item : json.readTree(response.body()).path("data")) {
@@ -83,7 +83,7 @@ public final class TvdbHttpMetadataProvider implements MetadataProvider {
                 .build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("TVDB 登录失败（HTTP " + response.statusCode() + "）");
+            throw new MetadataHttpException("TVDB 登录", response.statusCode(), response.headers());
         }
         token = json.readTree(response.body()).path("data").path("token").asText();
         return token;

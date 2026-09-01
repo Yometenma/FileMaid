@@ -46,7 +46,7 @@ public final class OmdbHttpMetadataProvider implements MetadataProvider {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(timeout).GET().build();
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("OMDb 请求失败（HTTP " + response.statusCode() + "）");
+            throw new MetadataHttpException("OMDb", response.statusCode(), response.headers());
         }
         List<MetadataCandidate> values = new ArrayList<>();
         JsonNode search = json.readTree(response.body()).path("Search");

@@ -110,7 +110,7 @@ public final class AnidbHttpMetadataProvider implements MetadataProvider {
                 .GET().build();
         HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("AniDB 索引下载失败（HTTP " + response.statusCode() + "）");
+            throw new MetadataHttpException("AniDB 索引下载", response.statusCode(), response.headers());
         }
         StringBuilder sb = new StringBuilder(1 << 20);
         try (InputStream in = response.body();

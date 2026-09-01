@@ -11,11 +11,18 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import net.filemaid.application.port.MetadataCacheRepository;
 import net.filemaid.application.port.MetadataProvider;
 import net.filemaid.application.service.SettingsService;
 import net.filemaid.core.model.MetadataCandidate;
 import net.filemaid.core.model.MetadataType;
 import net.filemaid.infrastructure.metadata.AnidbHttpMetadataProvider;
+import net.filemaid.infrastructure.metadata.MetadataHttpException;
 import net.filemaid.infrastructure.metadata.OmdbHttpMetadataProvider;
 import net.filemaid.infrastructure.metadata.TmdbHttpMetadataProvider;
 import net.filemaid.infrastructure.metadata.TvMazeHttpMetadataProvider;
@@ -26,14 +33,15 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
     private final String providerId;
     private final FileMaidProperties properties;
     private final SettingsService settings;
+    private final MetadataCacheRepository durableCache;
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
     private final Map<String, Object> cacheLocks = new ConcurrentHashMap<>();
     private static final long SUCCESS_TTL_MS = Duration.ofHours(24).toMillis();
     private static final long EMPTY_TTL_MS = Duration.ofHours(1).toMillis();
     private static final long STALE_TTL_MS = Duration.ofDays(7).toMillis();
 
-    public RuntimeMetadataProvider(String providerId, FileMaidProperties properties, SettingsService settings) {
-        this.providerId = providerId; this.properties = properties; this.settings = settings;
+    public RuntimeMetadataProvider(String providerId, FileMaidProperties properties, SettingsService settings, MetadataCacheRepository durableCache) {
+        this.providerId = providerId; this.properties = properties; this.settings = settings; this.durableCache = durableCache;
     }
 
     @Override public String id() { return providerId; }
@@ -42,7 +50,8 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
 
     @Override public List<MetadataCandidate> search(String query, MetadataType type, Locale locale, int limit) throws Exception {
         String key = cacheKey(query, type, locale, limit);
-        CacheEntry existing = cache.get(key);
+        CacheEntry existing = cache.computeIfAbsent(key, ignored -> durableCache.find(key)
+                .map(entry -> new CacheEntry(entry.candidates(), entry.createdAt().toEpochMilli(), entry.ttlSeconds() * 1_000L)).orElse(null));
         long now = System.currentTimeMillis();
         if (existing != null && now - existing.createdAt() < existing.ttlMillis()) return existing.value();
         Object lock = cacheLocks.computeIfAbsent(key, ignored -> new Object());
@@ -55,13 +64,17 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
                 Exception last = null;
                 for (int attempt = 0; attempt <= retries; attempt++) {
                     try {
+                        consumeRequestBudget();
                         List<MetadataCandidate> result = List.copyOf(delegate().search(query, type, locale, limit));
                         if (cache.size() >= 1_000) cache.clear();
                         cache.put(key, new CacheEntry(result, now, result.isEmpty() ? EMPTY_TTL_MS : SUCCESS_TTL_MS));
+                        durableCache.save(key, providerId, result, Instant.ofEpochMilli(now), (result.isEmpty() ? EMPTY_TTL_MS : SUCCESS_TTL_MS) / 1_000L);
+                        if (java.util.concurrent.ThreadLocalRandom.current().nextInt(100) == 0) durableCache.deleteOlderThan(Instant.now().minus(Duration.ofDays(7)));
                         return result;
                     } catch (Exception failure) {
                         last = failure;
-                        if (attempt < retries) backoff(attempt, failure);
+                        if (attempt >= retries || !retryable(failure)) break;
+                        backoff(attempt, failure);
                     }
                 }
                 if (existing != null && now - existing.createdAt() < STALE_TTL_MS) return existing.value();
@@ -77,12 +90,36 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
     }
 
     private void backoff(int attempt, Exception failure) throws InterruptedException {
-        long base = failure.getMessage() != null && failure.getMessage().contains("HTTP 429") ? 1_000L : 250L;
-        long delay = Math.min(8_000L, base << Math.min(attempt, 5));
+        long instructed = failure instanceof MetadataHttpException http
+                ? http.retryAfter().map(Duration::toMillis).orElse(0L) : 0L;
+        long base = failure instanceof MetadataHttpException http && http.statusCode() == 429 ? 1_000L : 250L;
+        long delay = instructed > 0 ? Math.min(30_000L, instructed) : Math.min(8_000L, base << Math.min(attempt, 5));
         Thread.sleep(delay + java.util.concurrent.ThreadLocalRandom.current().nextLong(100L));
     }
 
+    private boolean retryable(Exception failure) {
+        if (failure instanceof MetadataHttpException http) return http.statusCode() == 429 || http.statusCode() >= 500;
+        return failure instanceof java.io.IOException;
+    }
+
     private record CacheEntry(List<MetadataCandidate> value, long createdAt, long ttlMillis) { }
+
+    private void consumeRequestBudget() {
+        if (!"omdb".equals(providerId)) return;
+        int limit = integer("provider.omdb.dailyLimit", 1_000, 0, 1_000_000);
+        String apiKey = value("apiKey", properties.metadata().omdbApiKey());
+        if (limit == 0 || apiKey.isBlank()) return;
+        if (!durableCache.tryConsumeDaily(providerId, sha256(apiKey), LocalDate.now(ZoneOffset.UTC), limit)) {
+            throw new IllegalStateException("OMDb 今日请求已达到本机设定上限（" + limit + "），可等待 UTC 次日或调整设置");
+        }
+    }
+
+    private String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest);
+        } catch (Exception failure) { throw new IllegalStateException("无法计算请求配额标识", failure); }
+    }
 
     private MetadataProvider delegate() {
         Duration timeout = Duration.ofSeconds(integer("network.timeoutSeconds", 20, 1, 300));

@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'net.filemaid'
-version = '0.1.0'
+version = '0.1.1'
 
 allprojects {
     group = rootProject.group
@@ -24,6 +24,11 @@ subprojects {
             options.encoding = 'UTF-8'
             options.compilerArgs += ['-parameters']
         }
-        tasks.withType(Test).configureEach { useJUnitPlatform() }
+        tasks.withType(Test).configureEach {
+            useJUnitPlatform()
+            def testTemp = layout.buildDirectory.dir('tmp/junit').get().asFile
+            systemProperty 'java.io.tmpdir', testTemp.absolutePath
+            doFirst { testTemp.mkdirs() }
+        }
     }
 }

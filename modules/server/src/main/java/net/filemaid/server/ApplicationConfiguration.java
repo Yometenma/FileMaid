@@ -5,6 +5,7 @@ import net.filemaid.application.port.MediaScanner;
 import net.filemaid.application.port.MediaNameParser;
 import net.filemaid.application.port.MediaInfoProvider;
 import net.filemaid.application.port.MetadataProvider;
+import net.filemaid.application.port.MetadataCacheRepository;
 import net.filemaid.application.port.NamingTemplateEngine;
 import net.filemaid.application.port.SimilarityRanker;
 import net.filemaid.application.port.MatchDecisionRepository;
@@ -44,8 +45,9 @@ import net.filemaid.infrastructure.metadata.TvMazeHttpMetadataProvider;
 import net.filemaid.infrastructure.metadata.TvdbHttpMetadataProvider;
 import net.filemaid.infrastructure.naming.SafeNamingTemplateEngine;
 import net.filemaid.infrastructure.persistence.SqliteMatchDecisionRepository;
+import net.filemaid.infrastructure.persistence.SqliteMetadataCacheRepository;
 import net.filemaid.infrastructure.persistence.SqliteOperationHistoryRepository;
-import net.filemaid.infrastructure.persistence.InMemoryTaskRepository;
+import net.filemaid.infrastructure.persistence.SqliteTaskRepository;
 import net.filemaid.infrastructure.persistence.SqliteSettingsRepository;
 import net.filemaid.infrastructure.postprocess.LocalMediaPostProcessor;
 import net.filemaid.infrastructure.persistence.SqliteUserAccountRepository;
@@ -77,7 +79,8 @@ public class ApplicationConfiguration {
         return new ExecuteRenamePlanService(storageRoots(properties), pathPolicy, history, settings);
     }
     @Bean SettingsRepository settingsRepository(FileMaidProperties properties) { return new SqliteSettingsRepository(properties.dbPath()); }
-    @Bean TaskRepository taskRepository() { return new InMemoryTaskRepository(); }
+    @Bean MetadataCacheRepository metadataCacheRepository(FileMaidProperties properties) { return new SqliteMetadataCacheRepository(properties.dbPath()); }
+    @Bean TaskRepository taskRepository(FileMaidProperties properties) { return new SqliteTaskRepository(properties.dbPath()); }
     @Bean UserAccountRepository userAccountRepository(FileMaidProperties properties) { return new SqliteUserAccountRepository(properties.dbPath()); }
     @Bean SettingsService settingsService(SettingsRepository repository) { return new SettingsService(repository); }
     @Bean MediaPostProcessor mediaPostProcessor() { return new LocalMediaPostProcessor(); }
@@ -98,11 +101,11 @@ public class ApplicationConfiguration {
         return new ScanMediaService(storageRoots(properties), scanner, pathPolicy, settings);
     }
 
-    @Bean MetadataProvider tmdbMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("tmdb", properties, settings); }
-    @Bean MetadataProvider tvdbMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("tvdb", properties, settings); }
-    @Bean MetadataProvider omdbMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("omdb", properties, settings); }
-    @Bean MetadataProvider tvmazeMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("tvmaze", properties, settings); }
-    @Bean MetadataProvider anidbMetadataProvider(FileMaidProperties properties, SettingsService settings) { return new RuntimeMetadataProvider("anidb", properties, settings); }
+    @Bean MetadataProvider tmdbMetadataProvider(FileMaidProperties properties, SettingsService settings, MetadataCacheRepository cache) { return new RuntimeMetadataProvider("tmdb", properties, settings, cache); }
+    @Bean MetadataProvider tvdbMetadataProvider(FileMaidProperties properties, SettingsService settings, MetadataCacheRepository cache) { return new RuntimeMetadataProvider("tvdb", properties, settings, cache); }
+    @Bean MetadataProvider omdbMetadataProvider(FileMaidProperties properties, SettingsService settings, MetadataCacheRepository cache) { return new RuntimeMetadataProvider("omdb", properties, settings, cache); }
+    @Bean MetadataProvider tvmazeMetadataProvider(FileMaidProperties properties, SettingsService settings, MetadataCacheRepository cache) { return new RuntimeMetadataProvider("tvmaze", properties, settings, cache); }
+    @Bean MetadataProvider anidbMetadataProvider(FileMaidProperties properties, SettingsService settings, MetadataCacheRepository cache) { return new RuntimeMetadataProvider("anidb", properties, settings, cache); }
 
     private List<StorageRoot> storageRoots(FileMaidProperties properties) {
         return properties.roots().stream()

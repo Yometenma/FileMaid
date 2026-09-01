@@ -23,16 +23,18 @@ import org.springframework.stereotype.Service;
 @Service
 public class BackgroundTaskService {
     private final TaskRepository repository;
+    private final NotificationService notifications;
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     private final Map<String, Future<?>> futures = new ConcurrentHashMap<>();
     private final Map<String, AtomicBoolean> cancellations = new ConcurrentHashMap<>();
 
-    public BackgroundTaskService(TaskRepository repository) {
+    public BackgroundTaskService(TaskRepository repository, NotificationService notifications) {
         this.repository = repository;
+        this.notifications = notifications;
     }
 
     public String submit(String type, String initialMessage, TaskWork work) {
-        repository.removeOlderThan(Instant.now().minus(Duration.ofHours(1)));
+        repository.removeOlderThan(Instant.now().minus(Duration.ofDays(7)));
         String id = UUID.randomUUID().toString();
         Instant now = Instant.now();
         repository.save(new Task(id, type, Task.Status.PENDING, 0, initialMessage, null, null, now, now));
@@ -80,6 +82,7 @@ public class BackgroundTaskService {
                 update(id, Task.Status.FAILED, 100, "失败", null, failure.getMessage());
             }
         } finally {
+            repository.findById(id).filter(task -> "EXECUTE".equals(task.type())).ifPresent(notifications::sendTaskCompletion);
             futures.remove(id);
             cancellations.remove(id);
         }

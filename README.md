@@ -4,7 +4,7 @@
 
 **自托管的媒体文件整理工具**
 
-当前测试版本：**0.1.0** · [查看变更记录](CHANGELOG.md)
+当前测试版本：**0.1.1** · [查看变更记录](CHANGELOG.md)
 
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)
@@ -32,7 +32,7 @@ FileMaid 运行在你自己的服务器上，通过 Web UI 帮你扫描媒体目
 | ↩️ **历史与撤销** | SQLite 记录逐文件结果，MOVE 移回、COPY/HARDLINK 删除目标 |
 | 🖼️ **后处理** | 可选生成 Kodi NFO 与下载封面，固化进确认计划，历史可撤销 |
 | 🔐 **单用户登录** | 首次设置管理员账号、BCrypt、会话与 CSRF 防护 |
-| ⚙️ **动态设置** | 网络代理、API 密钥、命名、匹配、扫描等 47 项设置存 SQLite，改即生效 |
+| ⚙️ **动态设置** | 网络代理、API 密钥、命名、匹配、扫描等 49 项设置存 SQLite，改即生效 |
 
 ## 当前状态
 
@@ -52,10 +52,11 @@ docker compose up --build
 > 示例 Compose 默认把媒体目录以**只读**方式挂载（`:ro`），首次试用建议保持只读，只做扫描、匹配和校验。确认目标路径符合预期后，再把卷改为 `:rw` 并在 `.env` 里设置 `FILEMAID_ROOT_WRITABLE=true`。
 
 远程访问请参阅 [反向代理与 HTTPS](docs/reverse-proxy.md)。元数据服务的许可、署名、限流与缓存原则见 [元数据提供器策略](docs/metadata-provider-policy.md)。
+升级、数据库恢复和忘记密码的处理见 [升级、备份与恢复](docs/upgrade-and-recovery.md)。
 
 ## ⚙️ 配置
 
-通过环境变量调整，`.env` 里定义的变量会被 `compose.yaml` 透传。运行时更细的设置（代理、元数据密钥、命名模板、匹配阈值、后处理开关、扫描规则等 47 项）在 Web 设置页修改，存入 SQLite，改即生效。
+通过环境变量调整，`.env` 里定义的变量会被 `compose.yaml` 透传。运行时更细的设置（代理、元数据密钥、命名模板、匹配阈值、后处理开关、扫描规则等 49 项）在 Web 设置页修改，存入 SQLite，改即生效。
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -79,6 +80,8 @@ docker compose up --build
 | `FILEMAID_NAMING_UNKNOWN` | *(内置)* | 未分类文件命名模板 |
 
 > 网络代理在设置页配置，支持 HTTP 代理（`java.net.http.HttpClient` 不支持 SOCKS，故未提供 SOCKS 选项）。
+>
+> GitHub 源码与发布镜像**不包含任何 API 密钥**。上表中的密钥变量默认均为空，仅供部署者在自己的 `.env` 中注入；也可登录后在设置页填写。不要提交 `.env`、`config/` 或数据库备份。
 
 ## 📐 命名模板
 
@@ -113,7 +116,7 @@ API 根路径为 `/api/v1`。除健康检查、认证状态、首次设置和登
 | --- | --- |
 | `GET /api/v1/roots` | 列出已配置的存储根目录 |
 | `GET /api/v1/roots/{rootId}/directories?path=&query=` | 安全浏览及搜索根目录内的文件夹 |
-| `GET /api/v1/roots/{rootId}/scan?path=` | 扫描根目录下的相对路径 |
+| `POST /api/v1/roots/{rootId}/scan?path=` | 创建后台扫描任务，返回任务 ID |
 | `GET /api/v1/roots/{rootId}/probe?path=` | 探测单个文件的媒体信息（编码 / 分辨率 / 音轨字幕轨） |
 | `POST /api/v1/media/parse` | 解析文件名（`{ "names": [...] }`） |
 | `POST /api/v1/media/groups/analyze` | 媒体分组 + 字幕/封面/NFO 关联分析 |
@@ -183,13 +186,13 @@ npm run build
 - [x] 接入 FFprobe / 媒体信息（分辨率、编解码器、音轨字幕轨）
 - [x] 执行写操作：重命名、移动、复制、硬链接（默认不覆盖，确认令牌 + 执行前重校验）
 - [x] 操作历史与撤销
-- [x] SQLite 设置仓库（47 项）与匹配决策持久化
+- [x] SQLite 设置仓库（49 项）、匹配决策与元数据缓存持久化
 - [x] 后处理：Kodi NFO + 封面下载（固化进确认计划，历史可撤销）
 - [x] Vue 3 前端 + 单用户登录 / 会话 / CSRF
 - [x] 反向代理 / HTTPS 部署说明
-- [ ] 可恢复的持久化后台任务与多标签页编辑锁
-- [ ] 批量编辑、伴随文件折叠展示、Vue Router 与前端自动化测试
-- [ ] 数据库备份/导出、密码修改/恢复、通知功能
+- [x] 持久化后台任务、断线恢复、任务取消与多标签页编辑锁
+- [x] 批量编辑、伴随文件折叠展示、刷新保留页面与前端 API 自动化测试
+- [x] 数据库备份、密码修改/离线恢复说明与整理完成 Webhook 通知
 
 ## 🔒 安全说明
 
