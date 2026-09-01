@@ -7,12 +7,22 @@ services:
       - "8080:8080"
     environment:
       FILEMAID_MEDIA_ROOT: /media
+      FILEMAID_DB_PATH: /config/filemaid.db
       FILEMAID_SCAN_MAX_DEPTH: 16
       FILEMAID_SCAN_MAX_FILES: 10000
       FILEMAID_TMDB_API_KEY: ${FILEMAID_TMDB_API_KEY:-}
+      FILEMAID_TVDB_API_KEY: ${FILEMAID_TVDB_API_KEY:-}
+      FILEMAID_TVDB_PIN: ${FILEMAID_TVDB_PIN:-}
+      FILEMAID_OMDB_API_KEY: ${FILEMAID_OMDB_API_KEY:-}
+      FILEMAID_TVMAZE_ENABLED: ${FILEMAID_TVMAZE_ENABLED:-true}
+      FILEMAID_ANIDB_ENABLED: ${FILEMAID_ANIDB_ENABLED:-true}
+      FILEMAID_FFPROBE_PATH: ${FILEMAID_FFPROBE_PATH:-ffprobe}
       FILEMAID_NAMING_SERIES: ${FILEMAID_NAMING_SERIES:-}
       FILEMAID_NAMING_MOVIE: ${FILEMAID_NAMING_MOVIE:-}
       FILEMAID_NAMING_UNKNOWN: ${FILEMAID_NAMING_UNKNOWN:-}
     volumes:
+      # 数据库持久化到宿主的 ./config
       - ./config:/config
+      # 媒体目录默认只读；要启用写操作（重命名/移动/复制/硬链接），
+      # 把 :ro 改为 :rw，并在启动参数里设 filemaid.roots[0].writable=true
       - ./data/media:/media:ro
