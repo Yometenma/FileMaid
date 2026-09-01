@@ -15,6 +15,7 @@ import net.filemaid.application.service.StoragePathPolicy;
 import net.filemaid.application.service.SearchMetadataService;
 import net.filemaid.application.service.AnalyzeMediaGroupsService;
 import net.filemaid.application.service.BuildRenamePlanService;
+import net.filemaid.application.service.ExecuteRenamePlanService;
 import net.filemaid.application.port.MatchDecisionRepository;
 import net.filemaid.application.service.MatchDecisionService;
 import net.filemaid.application.service.MatchMetadataService;
@@ -51,6 +52,12 @@ public class ApplicationConfiguration {
                 .map(root -> new StorageRoot(root.id(), root.path(), root.writable()))
                 .toList();
         return new ValidateRenamePlanService(roots, pathPolicy);
+    }
+    @Bean ExecuteRenamePlanService executeRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy) {
+        List<StorageRoot> roots = properties.roots().stream()
+                .map(root -> new StorageRoot(root.id(), root.path(), root.writable()))
+                .toList();
+        return new ExecuteRenamePlanService(roots, pathPolicy);
     }
     @Bean SearchMetadataService searchMetadataService(List<MetadataProvider> providers) { return new SearchMetadataService(providers); }
     @Bean SimilarityRanker similarityRanker() { return new BuiltinSimilarityRanker(); }

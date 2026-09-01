@@ -5,11 +5,13 @@ import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 import net.filemaid.application.service.AnalyzeMediaGroupsService;
 import net.filemaid.application.service.BuildRenamePlanService;
+import net.filemaid.application.service.ExecuteRenamePlanService;
 import net.filemaid.application.service.ParseMediaNameService;
 import net.filemaid.application.service.RenamePreviewService;
 import net.filemaid.application.service.ValidateRenamePlanService;
 import net.filemaid.core.model.MediaGroup;
 import net.filemaid.core.model.MetadataSelection;
+import net.filemaid.core.model.OperationResult;
 import net.filemaid.core.model.ParsedMediaName;
 import net.filemaid.core.model.RenameOperation;
 import net.filemaid.core.model.RenamePlan;
@@ -27,15 +29,17 @@ public class MediaController {
     private final AnalyzeMediaGroupsService groupService;
     private final BuildRenamePlanService buildPlanService;
     private final ValidateRenamePlanService validatePlanService;
+    private final ExecuteRenamePlanService executePlanService;
 
     public MediaController(ParseMediaNameService parseService, RenamePreviewService previewService,
             AnalyzeMediaGroupsService groupService, BuildRenamePlanService buildPlanService,
-            ValidateRenamePlanService validatePlanService) {
+            ValidateRenamePlanService validatePlanService, ExecuteRenamePlanService executePlanService) {
         this.parseService = parseService;
         this.previewService = previewService;
         this.groupService = groupService;
         this.buildPlanService = buildPlanService;
         this.validatePlanService = validatePlanService;
+        this.executePlanService = executePlanService;
     }
 
     @PostMapping("/media/groups/analyze")
@@ -65,6 +69,11 @@ public class MediaController {
     @PostMapping("/rename-plans/validate")
     ValidateRenamePlanService.PlanValidation validatePlan(@Valid @RequestBody ValidateRequest request) {
         return validatePlanService.validate(request.rootId(), request.operations());
+    }
+
+    @PostMapping("/rename-plans/execute")
+    List<OperationResult> executePlan(@Valid @RequestBody ValidateRequest request) {
+        return executePlanService.execute(request.rootId(), request.operations());
     }
 
     public record ParseRequest(@NotEmpty List<String> names) {}
