@@ -33,7 +33,13 @@ public final class PostProcessMediaService {
         List<OperationResult> results=new ArrayList<>();
         for(Item item:items){Path media=pathPolicy.resolve(root,item.mediaPath());if(!Files.isRegularFile(media)){results.add(new OperationResult(item.mediaPath(),item.mediaPath(),RenameOperation.OperationType.NFO,false,"媒体文件不存在"));continue;}
             if(nfo&&item.metadata()!=null)results.add(run(item.mediaPath(),RenameOperation.OperationType.NFO,()->processor.writeKodiNfo(media,item.metadata()),root));
-            if(artwork&&item.artworkUrl()!=null&&!item.artworkUrl().isBlank())results.add(run(item.mediaPath(),RenameOperation.OperationType.ARTWORK,()->processor.downloadArtwork(media,item.artworkUrl(),artworkType),root));
+            if(artwork&&item.artworkUrl()!=null&&!item.artworkUrl().isBlank()){
+                String type=artworkType==null||artworkType.isBlank()?"POSTER":artworkType.toUpperCase();
+                String fanartUrl=item.fanartUrl()!=null&&!item.fanartUrl().isBlank()?item.fanartUrl():item.artworkUrl();
+                if("FANART".equals(type)){results.add(run(item.mediaPath(),RenameOperation.OperationType.ARTWORK,()->processor.downloadArtwork(media,fanartUrl,"FANART"),root));}
+                else if("BOTH".equals(type)){results.add(run(item.mediaPath(),RenameOperation.OperationType.ARTWORK,()->processor.downloadArtwork(media,item.artworkUrl(),"POSTER"),root));results.add(run(item.mediaPath(),RenameOperation.OperationType.ARTWORK,()->processor.downloadArtwork(media,fanartUrl,"FANART"),root));}
+                else{results.add(run(item.mediaPath(),RenameOperation.OperationType.ARTWORK,()->processor.downloadArtwork(media,item.artworkUrl(),"POSTER"),root));}
+            }
         }
         if(!results.isEmpty())history.append(results); cleanupHistory(); return results;
     }
@@ -42,6 +48,10 @@ public final class PostProcessMediaService {
         if (history != null && days > 0) history.deleteOlderThan(Instant.now().minus(days, ChronoUnit.DAYS));
     }
     private OperationResult run(String source,RenameOperation.OperationType type,Action action,StorageRoot root){try{Path target=action.run();return new OperationResult(source,root.path().relativize(target).toString().replace('\\','/'),type,true,null);}catch(Exception failure){return new OperationResult(source,source,type,false,failure.getMessage());}}
-    public record Item(String mediaPath, MetadataSelection metadata, String artworkUrl) { }
+    public record Item(String mediaPath, MetadataSelection metadata, String artworkUrl, String fanartUrl) {
+        public Item(String mediaPath, MetadataSelection metadata, String artworkUrl) {
+            this(mediaPath, metadata, artworkUrl, null);
+        }
+    }
     @FunctionalInterface private interface Action { Path run() throws Exception; }
 }

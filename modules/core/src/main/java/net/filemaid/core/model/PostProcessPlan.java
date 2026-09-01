@@ -16,9 +16,12 @@ public record PostProcessPlan(boolean generateNfo, boolean downloadArtwork, Stri
 
     public boolean enabled() { return generateNfo || downloadArtwork; }
 
-    public record Item(String source, MetadataSelection metadata, String artworkUrl) {
+    public record Item(String source, MetadataSelection metadata, String artworkUrl, String fanartUrl) {
         public Item {
             if (source == null || source.isBlank()) throw new IllegalArgumentException("post-process item source must not be blank");
+        }
+        public Item(String source, MetadataSelection metadata, String artworkUrl) {
+            this(source, metadata, artworkUrl, null);
         }
     }
 }

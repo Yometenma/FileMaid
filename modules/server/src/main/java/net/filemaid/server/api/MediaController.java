@@ -110,7 +110,7 @@ public class MediaController {
                     .collect(Collectors.toMap(OperationResult::source, OperationResult::target, (a, b) -> a));
             List<PostProcessMediaService.Item> items = postProcess.items().stream()
                     .filter(item -> targetBySource.containsKey(item.source()))
-                    .map(item -> new PostProcessMediaService.Item(targetBySource.get(item.source()), item.metadata(), item.artworkUrl()))
+                    .map(item -> new PostProcessMediaService.Item(targetBySource.get(item.source()), item.metadata(), item.artworkUrl(), item.fanartUrl()))
                     .toList();
             if (!items.isEmpty()) {
                 results.addAll(postProcessService.process(plan.rootId(), items, postProcess.generateNfo(), postProcess.downloadArtwork(), postProcess.artworkType()));

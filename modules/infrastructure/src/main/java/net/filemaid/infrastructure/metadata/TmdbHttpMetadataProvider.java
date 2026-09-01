@@ -58,7 +58,10 @@ public final class TmdbHttpMetadataProvider implements MetadataProvider {
             Integer year = date != null && date.length() >= 4 ? parseYear(date.substring(0, 4)) : null;
             List<String> aliases = original == null || original.equals(title) ? List.of() : List.of(original);
             String poster=text(item,"poster_path");
-            values.add(new MetadataCandidate(id(), item.path("id").asText(), type, title, aliases, year, text(item, "overview"), poster==null?null:"https://image.tmdb.org/t/p/w500"+poster));
+            String backdrop=text(item,"backdrop_path");
+            values.add(new MetadataCandidate(id(), item.path("id").asText(), type, title, aliases, year, text(item, "overview"),
+                    poster==null?null:"https://image.tmdb.org/t/p/w500"+poster,
+                    backdrop==null?null:"https://image.tmdb.org/t/p/original"+backdrop));
         }
         return values;
     }

@@ -38,12 +38,12 @@ const confirmVisible = ref(false)
 const executionResults = ref<{source:string;target:string;success:boolean;error?:string}[]>([])
 type Task = { id:string; type:string; status:string; progress:number; message:string; error?:string; result?:any }
 const runningTasks = ref<Task[]>([])
-type Candidate = { provider:string;id:string;type:string;title:string;year?:number;overview?:string;artworkUrl?:string }
+type Candidate = { provider:string;id:string;type:string;title:string;year?:number;overview?:string;artworkUrl?:string;fanartUrl?:string }
 const metadataDrawer = ref(false), metadataLoading = ref(false), metadataQuery = ref(''), metadataType = ref('SERIES')
 const metadataCandidates = ref<Candidate[]>([]), activeSource = ref(''), selections = ref<Record<string,any>>({})
 type HistoryItem = { id:number;source:string;target:string;type:string;success:boolean;error?:string;timestamp:string }
 const history = ref<HistoryItem[]>([]), historyLoading = ref(false), historyQuery = ref('')
-const generateNfo=ref(false),downloadArtwork=ref(false),artworkType=ref('POSTER'),artworkUrls=ref<Record<string,string>>({})
+const generateNfo=ref(false),downloadArtwork=ref(false),artworkType=ref('POSTER'),artworkUrls=ref<Record<string,string>>({}),fanartUrls=ref<Record<string,string>>({})
 const candidateLimit=ref(10),matchThreshold=ref(.72)
 const filteredHistory = computed(() => history.value.filter(item => !historyQuery.value || `${item.source} ${item.target}`.toLowerCase().includes(historyQuery.value.toLowerCase())))
 const historyGroups = computed(() => {
@@ -163,6 +163,7 @@ async function searchMetadata() {
 async function applyCandidate(candidate:Candidate) {
   selections.value[activeSource.value]={source:activeSource.value,provider:candidate.provider,id:candidate.id,type:candidate.type,title:candidate.title,year:candidate.year??null}
   if(candidate.artworkUrl)artworkUrls.value[activeSource.value]=candidate.artworkUrl
+  if(candidate.fanartUrl)fanartUrls.value[activeSource.value]=candidate.fanartUrl
   metadataDrawer.value=false; await refreshPreviews(); ElMessage.success('匹配结果已应用')
 }
 async function autoMatch() {
@@ -171,7 +172,7 @@ async function autoMatch() {
   metadataLoading.value=true
   try {
     const results=await api<any[]>('/api/v1/metadata/match',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({limit:candidateLimit.value,names:rows.map(row=>row.source)})})
-    results.forEach((result,index)=>{const ranked=result.candidates?.[0];const top=ranked?.candidate;if(top&&ranked.score>=matchThreshold.value){const source=rows[index].source;selections.value[source]={source,provider:top.provider,id:top.id,type:top.type,title:top.title,year:top.year??null};if(top.artworkUrl)artworkUrls.value[source]=top.artworkUrl}})
+    results.forEach((result,index)=>{const ranked=result.candidates?.[0];const top=ranked?.candidate;if(top&&ranked.score>=matchThreshold.value){const source=rows[index].source;selections.value[source]={source,provider:top.provider,id:top.id,type:top.type,title:top.title,year:top.year??null};if(top.artworkUrl)artworkUrls.value[source]=top.artworkUrl;if(top.fanartUrl)fanartUrls.value[source]=top.fanartUrl}})
     await refreshPreviews(); ElMessage.success('自动匹配完成')
   } catch(error){ElMessage.error(error instanceof Error?error.message:'自动匹配失败')} finally {metadataLoading.value=false}
 }
@@ -211,7 +212,7 @@ async function validateSelected() {
       generateNfo: generateNfo.value,
       downloadArtwork: downloadArtwork.value,
       artworkType: artworkType.value,
-      items: selected.value.map(row => ({ source: row.source, metadata: selections.value[row.source] || null, artworkUrl: artworkUrls.value[row.source] || null }))
+      items: selected.value.map(row => ({ source: row.source, metadata: selections.value[row.source] || null, artworkUrl: artworkUrls.value[row.source] || null, fanartUrl: fanartUrls.value[row.source] || null }))
     }
     const result=await api<{valid:boolean;problems:string[];confirmationToken?:string}>('/api/v1/rename-plans/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rootId:rootId.value,operations:operations(),postProcess})})
     validationProblems.value=result.problems
@@ -264,6 +265,7 @@ function persistDraft() {
       previews: previews.value.map(p => ({ source: p.source, target: p.target, media: p.media, warnings: p.warnings })),
       selections: selections.value,
       artworkUrls: artworkUrls.value,
+      fanartUrls: fanartUrls.value,
       generateNfo: generateNfo.value,
       downloadArtwork: downloadArtwork.value,
       artworkType: artworkType.value
@@ -282,6 +284,7 @@ function restoreDraft() {
     if (Array.isArray(draft.previews) && draft.previews.length) previews.value = draft.previews
     if (draft.selections) selections.value = draft.selections
     if (draft.artworkUrls) artworkUrls.value = draft.artworkUrls
+    if (draft.fanartUrls) fanartUrls.value = draft.fanartUrls
     if (draft.generateNfo != null) generateNfo.value = draft.generateNfo
     if (draft.downloadArtwork != null) downloadArtwork.value = draft.downloadArtwork
     if (draft.artworkType) artworkType.value = draft.artworkType
@@ -289,7 +292,7 @@ function restoreDraft() {
   } catch { /* 忽略恢复失败 */ }
 }
 
-watch([previews, selections, relativePath, operation, artworkUrls, generateNfo, downloadArtwork, artworkType], persistDraft, { deep: true })
+watch([previews, selections, relativePath, operation, artworkUrls, fanartUrls, generateNfo, downloadArtwork, artworkType], persistDraft, { deep: true })
 
 onMounted(async() => {
   applyTheme()
@@ -381,7 +384,7 @@ watch(page,value=>{if(value==='history')loadHistory()})
 
       <footer class="action-bar surface">
         <div><strong>已选择 {{ selected.length }} 项</strong><span>修改目标路径后需要重新校验</span></div>
-        <div class="postprocess-options"><el-checkbox v-model="generateNfo" @change="invalidatePlan">生成 NFO</el-checkbox><el-checkbox v-model="downloadArtwork" @change="invalidatePlan">下载封面</el-checkbox><el-select v-if="downloadArtwork" v-model="artworkType" size="small" @change="invalidatePlan"><el-option label="海报" value="POSTER"/><el-option label="背景图" value="FANART"/></el-select></div>
+        <div class="postprocess-options"><el-checkbox v-model="generateNfo" @change="invalidatePlan">生成 NFO</el-checkbox><el-checkbox v-model="downloadArtwork" @change="invalidatePlan">下载封面</el-checkbox><el-select v-if="downloadArtwork" v-model="artworkType" size="small" @change="invalidatePlan"><el-option label="海报" value="POSTER"/><el-option label="背景图" value="FANART"/><el-option label="全部" value="BOTH"/></el-select></div>
         <div><el-button :loading="validating" :disabled="!selected.length" @click="validateSelected">干跑校验</el-button><el-button type="primary" :disabled="!confirmationToken" @click="confirmVisible=true">执行整理</el-button></div>
       </footer>
       <DirectoryBrowser v-model="directoryBrowserOpen" :root-id="rootId" :initial-path="relativePath" @select="relativePath = $event" />
