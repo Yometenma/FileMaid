@@ -14,7 +14,9 @@ import net.filemaid.application.service.ScanMediaService;
 import net.filemaid.application.service.StoragePathPolicy;
 import net.filemaid.application.service.SearchMetadataService;
 import net.filemaid.application.service.AnalyzeMediaGroupsService;
+import net.filemaid.application.service.BuildRenamePlanService;
 import net.filemaid.application.service.MatchMetadataService;
+import net.filemaid.application.service.ValidateRenamePlanService;
 import net.filemaid.core.model.StorageRoot;
 import net.filemaid.infrastructure.filesystem.LocalMediaScanner;
 import net.filemaid.infrastructure.mediainfo.FfprobeMediaInfoProvider;
@@ -40,6 +42,13 @@ public class ApplicationConfiguration {
         return new SafeNamingTemplateEngine(naming.series(), naming.movie(), naming.unknown());
     }
     @Bean RenamePreviewService renamePreviewService(MediaNameParser parser, NamingTemplateEngine naming, ProbeMediaInfoService probeService) { return new RenamePreviewService(parser, naming, probeService); }
+    @Bean BuildRenamePlanService buildRenamePlanService(RenamePreviewService previewService) { return new BuildRenamePlanService(previewService); }
+    @Bean ValidateRenamePlanService validateRenamePlanService(FileMaidProperties properties, StoragePathPolicy pathPolicy) {
+        List<StorageRoot> roots = properties.roots().stream()
+                .map(root -> new StorageRoot(root.id(), root.path(), root.writable()))
+                .toList();
+        return new ValidateRenamePlanService(roots, pathPolicy);
+    }
     @Bean SearchMetadataService searchMetadataService(List<MetadataProvider> providers) { return new SearchMetadataService(providers); }
     @Bean SimilarityRanker similarityRanker() { return new BuiltinSimilarityRanker(); }
     @Bean MatchMetadataService matchMetadataService(MediaNameParser parser, SearchMetadataService searchService, SimilarityRanker ranker) { return new MatchMetadataService(parser, searchService, ranker); }
