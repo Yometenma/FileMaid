@@ -1,11 +1,13 @@
 package net.filemaid.infrastructure.naming;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.filemaid.application.port.NamingTemplateEngine;
+import net.filemaid.core.model.MediaInfo;
 import net.filemaid.core.model.MediaType;
 import net.filemaid.core.model.ParsedMediaName;
 
@@ -13,7 +15,7 @@ public final class SafeNamingTemplateEngine implements NamingTemplateEngine {
     public static final String DEFAULT_SERIES = "TV Shows/{title}/Season {season:02}/{title} - S{season:02}{episodes}{extension}";
     public static final String DEFAULT_MOVIE = "Movies/{title} ({year})/{title} ({year}){extension}";
     public static final String DEFAULT_UNKNOWN = "Unsorted/{original}";
-    private static final Pattern TOKEN = Pattern.compile("\\{([a-z]+)(?::(\\d+))?}");
+    private static final Pattern TOKEN = Pattern.compile("\\{([a-zA-Z][a-zA-Z0-9]*)(?::(\\d+))?}");
     private final String seriesTemplate;
     private final String movieTemplate;
     private final String unknownTemplate;
@@ -27,14 +29,13 @@ public final class SafeNamingTemplateEngine implements NamingTemplateEngine {
 
     @Override
     public String format(ParsedMediaName media) {
+        return format(media, null);
+    }
+
+    @Override
+    public String format(ParsedMediaName media, MediaInfo mediaInfo) {
         String template = media.type() == MediaType.EPISODE ? seriesTemplate : media.type() == MediaType.MOVIE ? movieTemplate : unknownTemplate;
-        Map<String, String> values = Map.of(
-                "title", safe(media.title()),
-                "year", media.year() == null ? "" : media.year().toString(),
-                "season", media.season() == null ? "" : media.season().toString(),
-                "episodes", episodeCode(media),
-                "extension", safeExtension(media.extension()),
-                "original", safe(media.originalName()));
+        Map<String, String> values = buildValues(media, mediaInfo);
         Matcher matcher = TOKEN.matcher(template);
         StringBuffer output = new StringBuffer();
         while (matcher.find()) {
@@ -54,6 +55,42 @@ public final class SafeNamingTemplateEngine implements NamingTemplateEngine {
         return Map.of("series", seriesTemplate, "movie", movieTemplate, "unknown", unknownTemplate);
     }
 
+    private Map<String, String> buildValues(ParsedMediaName media, MediaInfo info) {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("title", safe(media.title()));
+        values.put("year", media.year() == null ? "" : media.year().toString());
+        values.put("season", media.season() == null ? "" : media.season().toString());
+        values.put("episodes", episodeCode(media));
+        values.put("extension", safeExtension(media.extension()));
+        values.put("original", safe(media.originalName()));
+        if (info != null) {
+            values.put("resolution", blank(info.resolution()));
+            values.put("videoCodec", blank(info.videoCodec()));
+            values.put("videoProfile", blank(info.videoProfile()));
+            values.put("audioCodec", blank(info.audioCodec()));
+            values.put("audioLanguage", blank(info.audioLanguage()));
+            values.put("subtitleCodec", blank(info.subtitleCodec()));
+            values.put("subtitleLanguage", blank(info.subtitleLanguage()));
+            values.put("width", info.width() == null ? "" : info.width().toString());
+            values.put("height", info.height() == null ? "" : info.height().toString());
+            values.put("frameRate", blankNumber(info.frameRate()));
+            values.put("bitRate", blankNumber(info.bitRate()));
+            values.put("duration", blankNumber(info.durationSeconds()));
+            values.put("fileSize", info.fileSize() == null ? "" : info.fileSize().toString());
+        }
+        return values;
+    }
+
+    private static String blank(String value) { return value == null ? "" : value; }
+
+    private static String blankNumber(Number value) {
+        if (value == null) return "";
+        double d = value.doubleValue();
+        if (d == Math.rint(d)) return String.valueOf((long) d);
+        String formatted = String.format(Locale.ROOT, "%.3f", d);
+        return formatted.contains(".") ? formatted.replaceAll("0+$", "").replaceAll("\\.$", "") : formatted;
+    }
+
     private String episodeCode(ParsedMediaName media) {
         return media.episodes().stream().map(value -> String.format(Locale.ROOT, "E%02d", value)).reduce("", String::concat);
     }
@@ -64,8 +101,13 @@ public final class SafeNamingTemplateEngine implements NamingTemplateEngine {
     private void validateTemplate(String template) {
         if (template.length() > 500) throw new IllegalArgumentException("Naming template is too long");
         if (template.contains("..") || template.startsWith("/") || template.matches("^[A-Za-z]:.*")) throw new IllegalArgumentException("Naming template must be a relative path");
-        Matcher matcher = TOKEN.matcher(template); while (matcher.find()) if (!SetHolder.ALLOWED.contains(matcher.group(1))) throw new IllegalArgumentException("Unknown naming token: " + matcher.group(1));
-        if (template.replaceAll("\\{[a-z]+(?::\\d+)?}", "").contains("{")) throw new IllegalArgumentException("Invalid naming template syntax");
+        Matcher matcher = TOKEN.matcher(template); while (matcher.find()) if (!ALLOWED.contains(matcher.group(1))) throw new IllegalArgumentException("Unknown naming token: " + matcher.group(1));
+        if (template.replaceAll("\\{[a-zA-Z][a-zA-Z0-9]*(?::\\d+)?}", "").contains("{")) throw new IllegalArgumentException("Invalid naming template syntax");
     }
-    private static final class SetHolder { static final java.util.Set<String> ALLOWED = java.util.Set.of("title", "year", "season", "episodes", "extension", "original"); }
+
+    private static final java.util.Set<String> ALLOWED = java.util.Set.of(
+            "title", "year", "season", "episodes", "extension", "original",
+            "resolution", "videoCodec", "videoProfile", "audioCodec", "audioLanguage",
+            "subtitleCodec", "subtitleLanguage", "width", "height", "frameRate",
+            "bitRate", "duration", "fileSize");
 }

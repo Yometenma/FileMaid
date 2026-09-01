@@ -21,6 +21,7 @@ FileMaid 运行在你自己的服务器上，通过 Web UI 帮你扫描媒体目
 | 🗂️ **浏览目录** | 只读浏览挂载的媒体目录 |
 | 🔍 **扫描识别** | 识别电影、剧集、动漫、字幕和关联文件 |
 | 🏷️ **解析文件名** | 从文件名提取标题、年份、季数、集数 |
+| 🎞️ **媒体探测** | 用 ffprobe 读取分辨率、编解码器、音轨与字幕轨信息 |
 | 🎬 **元数据匹配** | 接入 TMDB，搜索候选并绑定到具体源文件 |
 | 📐 **命名预览** | 用模板生成电影 / 剧集 / 未分类的目标路径 |
 | 🔗 **媒体分组** | 自动把字幕关联到对应视频，孤立字幕会给出提醒 |
@@ -55,6 +56,7 @@ docker compose up --build
 | `FILEMAID_SCAN_MAX_DEPTH` | `16` | 扫描最大目录深度 |
 | `FILEMAID_SCAN_MAX_FILES` | `10000` | 单次扫描最大文件数 |
 | `FILEMAID_TMDB_API_KEY` | *(空)* | TMDB API 密钥，未配置时扫描与预览仍可用 |
+| `FILEMAID_FFPROBE_PATH` | `ffprobe` | ffprobe 可执行文件路径（媒体探测） |
 | `FILEMAID_NAMING_SERIES` | *(内置)* | 剧集命名模板 |
 | `FILEMAID_NAMING_MOVIE` | *(内置)* | 电影命名模板 |
 | `FILEMAID_NAMING_UNKNOWN` | *(内置)* | 未分类文件命名模板 |
@@ -71,6 +73,8 @@ docker compose up --build
 
 可用变量：`{title}` · `{year}` · `{season:02}` · `{episodes}` · `{extension}` · `{original}`
 
+媒体信息变量（探测到后可用）：`{resolution}` · `{videoCodec}` · `{videoProfile}` · `{audioCodec}` · `{audioLanguage}` · `{subtitleCodec}` · `{subtitleLanguage}` · `{width}` · `{height}` · `{frameRate}` · `{bitRate}` · `{duration}` · `{fileSize}`
+
 ## 🔌 HTTP API
 
 当前 API 全部为只读，根路径 `/api/v1`：
@@ -80,6 +84,7 @@ docker compose up --build
 | `GET /api/v1/system/health` | 服务健康检查 |
 | `GET /api/v1/roots` | 列出已配置的存储根目录 |
 | `GET /api/v1/roots/{rootId}/scan?path=` | 扫描根目录下的相对路径 |
+| `GET /api/v1/roots/{rootId}/probe?path=` | 探测单个文件的媒体信息（编码 / 分辨率 / 音轨字幕轨） |
 | `POST /api/v1/media/parse` | 解析文件名（`{ "names": [...] }`） |
 | `POST /api/v1/media/groups/analyze` | 媒体分组 + 字幕关联分析 |
 | `POST /api/v1/rename-plans/preview` | 生成改名预览（可携带已选元数据） |
@@ -111,14 +116,14 @@ docker compose up --build
 | --- | --- |
 | `core` | 无框架领域模型与约束 |
 | `application` | 用例、端口与流程编排 |
-| `infrastructure` | 文件系统、解析器、元数据与命名模板适配器 |
+| `infrastructure` | 文件系统、解析器、元数据、媒体探测与命名模板适配器 |
 | `server` | Spring Boot HTTP 服务与配置入口 |
 | `legacy-engine` | 现有整理引擎（隔离，通过适配器逐步接入） |
 
 ## 🗺️ 路线图
 
 - [x] 只读扫描 / 解析 / 命名预览 / TMDB 匹配 / 媒体分组
-- [ ] 接入 FFprobe / 媒体信息（分辨率、编解码器、音轨字幕轨）
+- [x] 接入 FFprobe / 媒体信息（分辨率、编解码器、音轨字幕轨）
 - [ ] 执行写操作：重命名、移动、复制、硬链接（默认不覆盖）
 - [ ] 操作历史 + 任务日志 + 撤销
 - [ ] SQLite 持久化配置与匹配决策

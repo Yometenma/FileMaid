@@ -25,3 +25,5 @@ filemaid:
     series: ${FILEMAID_NAMING_SERIES:}
     movie: ${FILEMAID_NAMING_MOVIE:}
     unknown: ${FILEMAID_NAMING_UNKNOWN:}
+  probe:
+    ffprobe-path: ${FILEMAID_FFPROBE_PATH:ffprobe}
