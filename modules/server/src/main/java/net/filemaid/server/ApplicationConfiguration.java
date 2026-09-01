@@ -15,6 +15,8 @@ import net.filemaid.application.service.StoragePathPolicy;
 import net.filemaid.application.service.SearchMetadataService;
 import net.filemaid.application.service.AnalyzeMediaGroupsService;
 import net.filemaid.application.service.BuildRenamePlanService;
+import net.filemaid.application.port.MatchDecisionRepository;
+import net.filemaid.application.service.MatchDecisionService;
 import net.filemaid.application.service.MatchMetadataService;
 import net.filemaid.application.service.ValidateRenamePlanService;
 import net.filemaid.core.model.StorageRoot;
@@ -28,6 +30,7 @@ import net.filemaid.infrastructure.metadata.TmdbHttpMetadataProvider;
 import net.filemaid.infrastructure.metadata.TvMazeHttpMetadataProvider;
 import net.filemaid.infrastructure.metadata.TvdbHttpMetadataProvider;
 import net.filemaid.infrastructure.naming.SafeNamingTemplateEngine;
+import net.filemaid.infrastructure.persistence.SqliteMatchDecisionRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -52,6 +55,8 @@ public class ApplicationConfiguration {
     @Bean SearchMetadataService searchMetadataService(List<MetadataProvider> providers) { return new SearchMetadataService(providers); }
     @Bean SimilarityRanker similarityRanker() { return new BuiltinSimilarityRanker(); }
     @Bean MatchMetadataService matchMetadataService(MediaNameParser parser, SearchMetadataService searchService, SimilarityRanker ranker) { return new MatchMetadataService(parser, searchService, ranker); }
+    @Bean MatchDecisionRepository matchDecisionRepository(FileMaidProperties properties) { return new SqliteMatchDecisionRepository(properties.dbPath()); }
+    @Bean MatchDecisionService matchDecisionService(MatchDecisionRepository repository) { return new MatchDecisionService(repository); }
     @Bean AnalyzeMediaGroupsService analyzeMediaGroupsService(MediaNameParser parser) { return new AnalyzeMediaGroupsService(parser); }
     @Bean MediaInfoProvider mediaInfoProvider(FileMaidProperties properties) { return new FfprobeMediaInfoProvider(properties.probe().ffprobePath()); }
     @Bean ProbeMediaInfoService probeMediaInfoService(FileMaidProperties properties, StoragePathPolicy pathPolicy, MediaInfoProvider provider) {

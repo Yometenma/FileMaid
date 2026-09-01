@@ -5,13 +5,14 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties("filemaid")
-public record FileMaidProperties(List<Root> roots, Scan scan, Metadata metadata, Naming naming, Probe probe) {
+public record FileMaidProperties(List<Root> roots, Scan scan, Metadata metadata, Naming naming, Probe probe, String dbPath) {
     public FileMaidProperties {
         roots = roots == null ? List.of() : List.copyOf(roots);
         scan = scan == null ? new Scan(16, 10_000) : scan;
         metadata = metadata == null ? new Metadata(null, null, null, null, true, true) : metadata;
         naming = naming == null ? new Naming(null, null, null) : naming;
         probe = probe == null ? new Probe(null) : probe;
+        dbPath = dbPath == null || dbPath.isBlank() ? "./config/filemaid.db" : dbPath;
     }
 
     public record Root(String id, Path path, boolean writable) {}

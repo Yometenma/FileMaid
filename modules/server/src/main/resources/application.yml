@@ -12,6 +12,7 @@ management:
         include: health,info
 
 filemaid:
+  db-path: ${FILEMAID_DB_PATH:./config/filemaid.db}
   roots:
     - id: media
       path: ${FILEMAID_MEDIA_ROOT:./data/media}

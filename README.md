@@ -61,6 +61,7 @@ docker compose up --build
 | `FILEMAID_OMDB_API_KEY` | *(空)* | OMDb API 密钥 |
 | `FILEMAID_TVMAZE_ENABLED` | `true` | 是否启用 TVMaze（无需密钥） |
 | `FILEMAID_ANIDB_ENABLED` | `true` | 是否启用 AniDB 索引（无需密钥） |
+| `FILEMAID_DB_PATH` | `./config/filemaid.db` | SQLite 数据库文件路径 |
 | `FILEMAID_FFPROBE_PATH` | `ffprobe` | ffprobe 可执行文件路径（媒体探测） |
 | `FILEMAID_NAMING_SERIES` | *(内置)* | 剧集命名模板 |
 | `FILEMAID_NAMING_MOVIE` | *(内置)* | 电影命名模板 |
@@ -98,6 +99,8 @@ docker compose up --build
 | `GET /api/v1/metadata/providers` | 元数据提供器状态 |
 | `GET /api/v1/metadata/search?query=&type=&locale=&limit=` | TMDB 候选搜索（`type` = `MOVIE` / `SERIES`） |
 | `POST /api/v1/metadata/match` | 解析文件名并自动匹配排序候选（标题/年份相似度） |
+| `PUT /api/v1/match-decisions` | 保存用户确认的匹配决策 |
+| `GET /api/v1/match-decisions` | 查询匹配决策（可选 `source` 参数） |
 | `GET /api/v1/naming/templates` | 查看当前生效的命名模板 |
 | `GET /actuator/health` | Spring Actuator 健康端点 |
 
