@@ -1,0 +1,9 @@
+.gradle
+build
+**/build
+.git
+.idea
+tools
+modules/legacy-engine
+data
+config

@@ -1,0 +1,29 @@
+plugins {
+    id 'base'
+    id 'org.springframework.boot' version '3.5.16' apply false
+}
+
+group = 'net.filemaid'
+version = '0.1.0-SNAPSHOT'
+
+allprojects {
+    group = rootProject.group
+    version = rootProject.version
+    repositories {
+        maven { url = uri('https://maven.aliyun.com/repository/public') }
+        mavenCentral()
+    }
+}
+
+subprojects {
+    plugins.withId('java') {
+        java {
+            toolchain { languageVersion = JavaLanguageVersion.of(17) }
+        }
+        tasks.withType(JavaCompile).configureEach {
+            options.encoding = 'UTF-8'
+            options.compilerArgs += ['-parameters']
+        }
+        tasks.withType(Test).configureEach { useJUnitPlatform() }
+    }
+}

@@ -1,0 +1,18 @@
+services:
+  filemaid:
+    build: .
+    container_name: filemaid
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      FILEMAID_MEDIA_ROOT: /media
+      FILEMAID_SCAN_MAX_DEPTH: 16
+      FILEMAID_SCAN_MAX_FILES: 10000
+      FILEMAID_TMDB_API_KEY: ${FILEMAID_TMDB_API_KEY:-}
+      FILEMAID_NAMING_SERIES: ${FILEMAID_NAMING_SERIES:-}
+      FILEMAID_NAMING_MOVIE: ${FILEMAID_NAMING_MOVIE:-}
+      FILEMAID_NAMING_UNKNOWN: ${FILEMAID_NAMING_UNKNOWN:-}
+    volumes:
+      - ./config:/config
+      - ./data/media:/media:ro

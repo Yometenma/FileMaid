@@ -1,0 +1,20 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'filemaid'
+
+include 'modules:legacy-engine'
+include 'modules:core'
+include 'modules:application'
+include 'modules:infrastructure'
+include 'modules:server'
+
+project(':modules:legacy-engine').name = 'legacy-engine'
+project(':modules:core').name = 'core'
+project(':modules:application').name = 'application'
+project(':modules:infrastructure').name = 'infrastructure'
+project(':modules:server').name = 'server'
