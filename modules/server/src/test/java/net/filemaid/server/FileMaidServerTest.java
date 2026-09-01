@@ -21,7 +21,9 @@ import org.springframework.http.MediaType;
 @SpringBootTest(properties = {
         "filemaid.roots[0].id=media",
         "filemaid.roots[0].path=build/test-media",
-        "filemaid.roots[0].writable=false"
+        "filemaid.roots[0].writable=false",
+        "filemaid.metadata.tvmaze-enabled=false",
+        "filemaid.metadata.anidb-enabled=false"
 })
 @AutoConfigureMockMvc
 class FileMaidServerTest {

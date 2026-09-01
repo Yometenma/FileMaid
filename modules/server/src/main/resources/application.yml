@@ -23,6 +23,9 @@ filemaid:
     tmdb-api-key: ${FILEMAID_TMDB_API_KEY:}
     tvdb-api-key: ${FILEMAID_TVDB_API_KEY:}
     tvdb-pin: ${FILEMAID_TVDB_PIN:}
+    omdb-api-key: ${FILEMAID_OMDB_API_KEY:}
+    tvmaze-enabled: ${FILEMAID_TVMAZE_ENABLED:true}
+    anidb-enabled: ${FILEMAID_ANIDB_ENABLED:true}
   naming:
     series: ${FILEMAID_NAMING_SERIES:}
     movie: ${FILEMAID_NAMING_MOVIE:}
