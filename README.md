@@ -90,6 +90,7 @@ docker compose up --build
 | `POST /api/v1/rename-plans/preview` | 生成改名预览（可携带已选元数据；传 `rootId` 触发媒体探测并标记重名冲突） |
 | `GET /api/v1/metadata/providers` | 元数据提供器状态 |
 | `GET /api/v1/metadata/search?query=&type=&locale=&limit=` | TMDB 候选搜索（`type` = `MOVIE` / `SERIES`） |
+| `POST /api/v1/metadata/match` | 解析文件名并自动匹配排序候选（标题/年份相似度） |
 | `GET /api/v1/naming/templates` | 查看当前生效的命名模板 |
 | `GET /actuator/health` | Spring Actuator 健康端点 |
 

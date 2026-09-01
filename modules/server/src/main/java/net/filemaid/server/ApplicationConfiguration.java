@@ -6,6 +6,7 @@ import net.filemaid.application.port.MediaNameParser;
 import net.filemaid.application.port.MediaInfoProvider;
 import net.filemaid.application.port.MetadataProvider;
 import net.filemaid.application.port.NamingTemplateEngine;
+import net.filemaid.application.port.SimilarityRanker;
 import net.filemaid.application.service.ParseMediaNameService;
 import net.filemaid.application.service.ProbeMediaInfoService;
 import net.filemaid.application.service.RenamePreviewService;
@@ -13,10 +14,12 @@ import net.filemaid.application.service.ScanMediaService;
 import net.filemaid.application.service.StoragePathPolicy;
 import net.filemaid.application.service.SearchMetadataService;
 import net.filemaid.application.service.AnalyzeMediaGroupsService;
+import net.filemaid.application.service.MatchMetadataService;
 import net.filemaid.core.model.StorageRoot;
 import net.filemaid.infrastructure.filesystem.LocalMediaScanner;
 import net.filemaid.infrastructure.mediainfo.FfprobeMediaInfoProvider;
 import net.filemaid.infrastructure.parser.LegacyMediaNameParserAdapter;
+import net.filemaid.infrastructure.metadata.LegacySimilarityRanker;
 import net.filemaid.infrastructure.metadata.PreferredTmdbMetadataProvider;
 import net.filemaid.infrastructure.naming.SafeNamingTemplateEngine;
 import org.springframework.context.annotation.Bean;
@@ -35,6 +38,8 @@ public class ApplicationConfiguration {
     @Bean RenamePreviewService renamePreviewService(MediaNameParser parser, NamingTemplateEngine naming, ProbeMediaInfoService probeService) { return new RenamePreviewService(parser, naming, probeService); }
     @Bean MetadataProvider metadataProvider(FileMaidProperties properties) { return new PreferredTmdbMetadataProvider(properties.metadata().tmdbApiKey()); }
     @Bean SearchMetadataService searchMetadataService(MetadataProvider provider) { return new SearchMetadataService(provider); }
+    @Bean SimilarityRanker similarityRanker() { return new LegacySimilarityRanker(); }
+    @Bean MatchMetadataService matchMetadataService(MediaNameParser parser, SearchMetadataService searchService, SimilarityRanker ranker) { return new MatchMetadataService(parser, searchService, ranker); }
     @Bean AnalyzeMediaGroupsService analyzeMediaGroupsService(MediaNameParser parser) { return new AnalyzeMediaGroupsService(parser); }
     @Bean MediaInfoProvider mediaInfoProvider(FileMaidProperties properties) { return new FfprobeMediaInfoProvider(properties.probe().ffprobePath()); }
     @Bean ProbeMediaInfoService probeMediaInfoService(FileMaidProperties properties, StoragePathPolicy pathPolicy, MediaInfoProvider provider) {
