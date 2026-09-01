@@ -21,7 +21,7 @@ public class SecurityConfiguration {
         if(!properties.auth().enabled()){http.csrf(csrf->csrf.disable()).authorizeHttpRequests(auth->auth.anyRequest().permitAll());return http.build();}
         var csrf=CookieCsrfTokenRepository.withHttpOnlyFalse();csrf.setCookiePath("/");
         http.csrf(config->config.csrfTokenRepository(csrf).csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
-                .authorizeHttpRequests(auth->auth.requestMatchers("/","/index.html","/assets/**","/favicon.ico","/api/v1/auth/status","/api/v1/auth/setup","/api/v1/auth/login","/api/v1/system/health","/actuator/health").permitAll().anyRequest().authenticated())
+                .authorizeHttpRequests(auth->auth.requestMatchers("/","/index.html","/assets/**","/favicon.ico","/error","/api/v1/auth/status","/api/v1/auth/setup","/api/v1/auth/login","/api/v1/system/health","/actuator/health").permitAll().anyRequest().authenticated())
                 .formLogin(form->form.loginProcessingUrl("/api/v1/auth/login").successHandler((request,response,authentication)->json(response,200,"{\"success\":true}")).failureHandler((request,response,failure)->json(response,401,"{\"error\":\"用户名或密码错误\"}")))
                 .logout(logout->logout.logoutUrl("/api/v1/auth/logout").logoutSuccessHandler((request,response,authentication)->json(response,200,"{\"success\":true}")))
                 .exceptionHandling(errors->errors.authenticationEntryPoint((request,response,failure)->json(response,401,"{\"error\":\"需要登录\"}")));

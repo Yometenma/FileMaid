@@ -34,4 +34,10 @@ class AuthSecurityTest {
         mvc.perform(post("/api/v1/auth/logout").session(session)).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/auth/logout").session(session).with(csrf())).andExpect(status().isOk());
     }
+
+    @Test void reportsFriendlyPasswordLengthError()throws Exception{
+        mvc.perform(post("/api/v1/auth/setup").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"admin\",\"password\":\"short\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("密码长度必须在 12-128 个字符之间"));
+    }
 }

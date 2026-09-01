@@ -23,7 +23,7 @@ public class AuthController {
     @GetMapping("/status") Status status(Principal principal,CsrfToken csrf){csrf.getToken();return new Status(properties.auth().enabled(),users.exists(),principal!=null,principal==null?null:principal.getName());}
     @PostMapping("/setup") Map<String,Boolean> setup(@Valid @RequestBody Setup request){if(!properties.auth().enabled())throw new IllegalStateException("身份验证已禁用");String username=request.username().trim();if(username.length()>64)throw new IllegalArgumentException("用户名过长");users.create(username,encoder.encode(request.password()));return Map.of("success",true);}
     @PostMapping("/change-password") Map<String,Boolean> changePassword(Principal principal,@Valid @RequestBody ChangePassword request){String username=principal.getName();var account=users.findByUsername(username).orElseThrow(()->new IllegalStateException("账号不存在"));if(!encoder.matches(request.currentPassword(),account.passwordHash()))throw new IllegalArgumentException("当前密码错误");users.updatePassword(username,encoder.encode(request.newPassword()));return Map.of("success",true);}
-    public record Setup(@NotBlank String username,@Size(min=12,max=128) String password){}
-    public record ChangePassword(@NotBlank String currentPassword,@NotBlank @Size(min=12,max=128) String newPassword){}
+    public record Setup(@NotBlank String username,@Size(min=12,max=128,message="密码长度必须在 12-128 个字符之间") String password){}
+    public record ChangePassword(@NotBlank String currentPassword,@NotBlank @Size(min=12,max=128,message="密码长度必须在 12-128 个字符之间") String newPassword){}
     public record Status(boolean enabled,boolean configured,boolean authenticated,String username){}
 }
