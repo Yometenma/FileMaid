@@ -17,6 +17,9 @@ import net.filemaid.core.model.ParsedMediaName;
 
 public final class AnalyzeMediaGroupsService {
     private static final Set<String> SUBTITLES = Set.of(".srt", ".ass", ".ssa", ".sub", ".vtt", ".sup");
+    private static final Set<String> IMAGES = Set.of(".jpg", ".jpeg", ".png", ".webp", ".avif");
+    private static final Set<String> NFO = Set.of(".nfo");
+    private static final Set<String> DIRECTORY_LEVEL_ARTWORK = Set.of("poster", "folder", "cover", "backdrop", "banner", "fanart", "thumb");
     private final MediaNameParser parser;
 
     public AnalyzeMediaGroupsService(MediaNameParser parser) { this.parser = parser; }
@@ -38,7 +41,29 @@ public final class AnalyzeMediaGroupsService {
                 group.warnings.add("发现未能关联到视频的字幕");
             }
         }
+        for (Item companion : items.stream().filter(item -> item.kind == MediaKind.IMAGE || item.kind == MediaKind.NFO).toList()) {
+            Item matched = bestVideo(companion, videos);
+            if (matched == null && isDirectoryLevelArtwork(companion)) {
+                matched = sameDirectoryVideo(companion, videos);
+            }
+            final Item video = matched;
+            if (video != null) {
+                groups.computeIfAbsent(groupKey(video.media), ignored -> new MutableGroup(video.media)).members.add(member(companion, video.path));
+            } else {
+                MutableGroup group = groups.computeIfAbsent("companion:" + companion.path.toLowerCase(Locale.ROOT), ignored -> new MutableGroup(companion.media));
+                group.members.add(member(companion, null));
+                group.warnings.add("发现未能关联到视频的伴随文件（封面/NFO）");
+            }
+        }
         return groups.entrySet().stream().map(entry -> entry.getValue().build(entry.getKey())).toList();
+    }
+
+    private boolean isDirectoryLevelArtwork(Item item) {
+        return DIRECTORY_LEVEL_ARTWORK.contains(normalizedStem(item.path));
+    }
+
+    private Item sameDirectoryVideo(Item companion, List<Item> videos) {
+        return videos.stream().filter(video -> parent(video.path).equals(parent(companion.path))).findFirst().orElse(null);
     }
 
     private Item bestVideo(Item subtitle, List<Item> videos) {
@@ -67,8 +92,16 @@ public final class AnalyzeMediaGroupsService {
         if (path.isAbsolute() || path.startsWith("..")) throw new IllegalArgumentException("Analysis paths must stay relative to a storage root");
         String normalized = path.toString().replace('\\', '/');
         ParsedMediaName parsed = parser.parse(path.getFileName().toString());
-        MediaKind kind = SUBTITLES.contains(parsed.extension().toLowerCase(Locale.ROOT)) ? MediaKind.SUBTITLE : MediaKind.VIDEO;
+        MediaKind kind = kindOf(parsed.extension());
         return new Item(normalized, kind, parsed);
+    }
+
+    private MediaKind kindOf(String extension) {
+        String ext = extension == null ? "" : extension.toLowerCase(Locale.ROOT);
+        if (SUBTITLES.contains(ext)) return MediaKind.SUBTITLE;
+        if (IMAGES.contains(ext)) return MediaKind.IMAGE;
+        if (NFO.contains(ext)) return MediaKind.NFO;
+        return MediaKind.VIDEO;
     }
 
     private String groupKey(ParsedMediaName media) {

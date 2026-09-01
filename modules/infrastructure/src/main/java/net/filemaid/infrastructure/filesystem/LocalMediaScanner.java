@@ -18,6 +18,7 @@ public final class LocalMediaScanner implements MediaScanner {
     private static final Set<String> SUBTITLE = Set.of("srt", "ass", "ssa", "sub", "vtt");
     private static final Set<String> AUDIO = Set.of("flac", "mp3", "m4a", "aac", "ogg", "opus", "wav");
     private static final Set<String> IMAGE = Set.of("jpg", "jpeg", "png", "webp", "avif");
+    private static final Set<String> NFO = Set.of("nfo");
 
     @Override
     public List<MediaFile> scan(StorageRoot root, Path start, int maxDepth, int maxFiles) throws IOException {
@@ -46,6 +47,7 @@ public final class LocalMediaScanner implements MediaScanner {
         if (SUBTITLE.contains(extension)) return MediaKind.SUBTITLE;
         if (AUDIO.contains(extension)) return MediaKind.AUDIO;
         if (IMAGE.contains(extension)) return MediaKind.IMAGE;
+        if (NFO.contains(extension)) return MediaKind.NFO;
         return MediaKind.OTHER;
     }
 
