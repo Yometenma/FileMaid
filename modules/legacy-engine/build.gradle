@@ -5,18 +5,6 @@ description = 'Existing FileMaid media organization engine, isolated from the se
 def legacyLibDir = providers.gradleProperty('filemaidLegacyLibDir')
         .orElse(providers.environmentVariable('FILEMAID_LEGACY_LIBS'))
         .orElse('D:/YomeXProjects/fb/deps')
-def legacyResourceDir = providers.gradleProperty('filemaidLegacyResourceDir')
-        .orElse(providers.environmentVariable('FILEMAID_LEGACY_RESOURCES'))
-        .orElse('D:/YomeXProjects/fb/src/main/resources')
-
-sourceSets {
-    main {
-        resources {
-            srcDir legacyResourceDir.get()
-            exclude 'META-INF/groovy/**'
-        }
-    }
-}
 
 dependencies {
     // Logging implementations are supplied by the host application. Keeping the

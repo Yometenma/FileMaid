@@ -13,7 +13,8 @@ public final class RegexMediaNameParser implements MediaNameParser {
     private static final Pattern EPISODE = Pattern.compile("(?i)(?:^|[ ._-])S(\\d{1,2})[ ._-]*E(\\d{1,3}(?:[ ._-]*E\\d{1,3})*)");
     private static final Pattern X_EPISODE = Pattern.compile("(?i)(?:^|[ ._-])(\\d{1,2})x(\\d{1,3})");
     private static final Pattern YEAR = Pattern.compile("(?:^|\\D)((?:19|20)\\d{2})(?:\\D|$)");
-    private static final Pattern RELEASE_TAGS = Pattern.compile("(?i)\\b(?:2160p|1080p|720p|480p|4k|uhd|bluray|blu-ray|web[- .]?dl|webrip|hdtv|x26[45]|hevc|av1|remux|proper|repack)\\b.*$");
+    private static final Pattern RELEASE_TAGS = Pattern.compile("(?i)\\b(?:2160p|1080p|720p|480p|4k|uhd|bluray|blu-ray|web[- .]?dl|webrip|hdtv|x26[45]|hevc|av1|remux|proper|repack|10bit|hdr|dovi|dv|aac|dts|truehd|atmos)\\b.*$");
+    private static final Pattern BRACKETS = Pattern.compile("\\[[^\\[\\]]*\\]|\\([^\\(\\)]*\\)|\\{[^\\{\\}]*\\}");
 
     @Override
     public ParsedMediaName parse(String fileName) {
@@ -62,6 +63,7 @@ public final class RegexMediaNameParser implements MediaNameParser {
 
     private String cleanTitle(String value) {
         String cleaned = RELEASE_TAGS.matcher(value).replaceFirst("");
+        cleaned = BRACKETS.matcher(cleaned).replaceAll(" ");
         cleaned = cleaned.replaceAll("^[\\[({]+|[\\])}]+$", "").replaceAll("[._]+", " ").replaceAll("\\s+-\\s+", " ").replaceAll("\\s+", " ").trim();
         return cleaned.isEmpty() ? "Unknown" : cleaned;
     }

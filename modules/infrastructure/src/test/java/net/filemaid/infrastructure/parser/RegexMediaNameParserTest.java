@@ -26,4 +26,21 @@ class RegexMediaNameParserTest {
         assertEquals("Example Movie", parsed.title());
         assertEquals(2024, parsed.year());
     }
+
+    @Test
+    void stripsReleaseGroupBracketsFromEpisodeTitle() {
+        var parsed = parser.parse("[Group] The Show S02E03 1080p.mkv");
+        assertEquals(MediaType.EPISODE, parsed.type());
+        assertEquals("The Show", parsed.title());
+        assertEquals(2, parsed.season());
+        assertEquals(List.of(3), parsed.episodes());
+    }
+
+    @Test
+    void stripsReleaseGroupBracketsFromMovieTitle() {
+        var parsed = parser.parse("[Group] Example.Movie.2024.mkv");
+        assertEquals(MediaType.MOVIE, parsed.type());
+        assertEquals("Example Movie", parsed.title());
+        assertEquals(2024, parsed.year());
+    }
 }
