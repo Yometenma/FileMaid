@@ -42,10 +42,15 @@ type Candidate = { provider:string;id:string;type:string;title:string;year?:numb
 const metadataDrawer = ref(false), metadataLoading = ref(false), metadataQuery = ref(''), metadataType = ref('SERIES')
 const metadataCandidates = ref<Candidate[]>([]), activeSource = ref(''), selections = ref<Record<string,any>>({})
 type HistoryItem = { id:number;batchId?:string;source:string;target:string;type:string;success:boolean;error?:string;timestamp:string }
-const history = ref<HistoryItem[]>([]), historyLoading = ref(false), historyQuery = ref('')
+const history = ref<HistoryItem[]>([]), historyLoading = ref(false), historyQuery = ref(''), historyStatus = ref('ALL'), historyType = ref('ALL')
 const generateNfo=ref(false),downloadArtwork=ref(false),artworkType=ref('POSTER'),artworkUrls=ref<Record<string,string>>({}),fanartUrls=ref<Record<string,string>>({})
 const candidateLimit=ref(10),matchThreshold=ref(.72),defaultMatchMode=ref('MANUAL')
-const filteredHistory = computed(() => history.value.filter(item => !historyQuery.value || `${item.source} ${item.target}`.toLowerCase().includes(historyQuery.value.toLowerCase())))
+const filteredHistory = computed(() => history.value.filter(item => {
+  const matchesQuery = !historyQuery.value || `${item.source} ${item.target}`.toLowerCase().includes(historyQuery.value.toLowerCase())
+  const matchesStatus = historyStatus.value === 'ALL' || (historyStatus.value === 'SUCCESS' ? item.success : !item.success)
+  const matchesType = historyType.value === 'ALL' || item.type === historyType.value
+  return matchesQuery && matchesStatus && matchesType
+}))
 const historyGroups = computed(() => {
   const groups: { key: string; time: string; items: HistoryItem[] }[] = []
   const batches = new Map<string, { key: string; time: string; items: HistoryItem[] }>()
@@ -439,7 +444,7 @@ watch(page,value=>{if(value==='history')loadHistory()})
     <main v-else-if="page === 'history'" class="page secondary-page">
       <section class="page-heading"><div><p class="eyebrow">操作记录</p><h1>整理历史</h1><p>按批次查看结果，并在目标路径仍然安全时撤销。</p></div></section>
       <section class="history-card surface">
-        <div class="table-toolbar"><div><h2>操作记录</h2><span>共 {{ historyGroups.length }} 批 · {{ filteredHistory.length }} 条</span></div><el-input v-model="historyQuery" clearable placeholder="搜索源路径或目标路径" style="width:300px"><template #prefix><Search/></template></el-input></div>
+        <div class="table-toolbar"><div><h2>操作记录</h2><span>共 {{ historyGroups.length }} 批 · {{ filteredHistory.length }} 条</span></div><div class="history-filters"><el-select v-model="historyStatus" style="width:110px"><el-option label="全部结果" value="ALL"/><el-option label="成功" value="SUCCESS"/><el-option label="失败" value="FAILED"/></el-select><el-select v-model="historyType" style="width:130px"><el-option label="全部操作" value="ALL"/><el-option label="移动" value="MOVE"/><el-option label="复制" value="COPY"/><el-option label="硬链接" value="HARDLINK"/><el-option label="NFO" value="NFO"/><el-option label="封面" value="ARTWORK"/></el-select><el-input v-model="historyQuery" clearable placeholder="搜索源路径或目标路径" style="width:260px"><template #prefix><Search/></template></el-input></div></div>
         <div class="history-batches" v-loading="historyLoading">
           <div v-if="!historyGroups.length" class="directory-empty">还没有整理记录</div>
           <el-collapse v-else>
