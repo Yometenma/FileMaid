@@ -44,7 +44,7 @@ const metadataCandidates = ref<Candidate[]>([]), activeSource = ref(''), selecti
 type HistoryItem = { id:number;batchId?:string;source:string;target:string;type:string;success:boolean;error?:string;timestamp:string }
 const history = ref<HistoryItem[]>([]), historyLoading = ref(false), historyQuery = ref('')
 const generateNfo=ref(false),downloadArtwork=ref(false),artworkType=ref('POSTER'),artworkUrls=ref<Record<string,string>>({}),fanartUrls=ref<Record<string,string>>({})
-const candidateLimit=ref(10),matchThreshold=ref(.72)
+const candidateLimit=ref(10),matchThreshold=ref(.72),defaultMatchMode=ref('MANUAL')
 const filteredHistory = computed(() => history.value.filter(item => !historyQuery.value || `${item.source} ${item.target}`.toLowerCase().includes(historyQuery.value.toLowerCase())))
 const historyGroups = computed(() => {
   const groups: { key: string; time: string; items: HistoryItem[] }[] = []
@@ -153,6 +153,7 @@ async function scan() {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths: videoPaths })
     }) : []
     message.value = `扫描完成，共生成 ${previews.value.length} 条整理预览`
+    if (defaultMatchMode.value === 'AUTO' && previews.value.length) await autoMatch()
     persistDraft()
   } catch (error) { message.value = error instanceof Error ? error.message : '扫描失败' }
   finally { loading.value = false }
@@ -316,6 +317,7 @@ onMounted(async() => {
     operation.value = settings['files.defaultOperation']||'MOVE'
     candidateLimit.value = Number(settings['metadata.candidateLimit'])||10
     matchThreshold.value = Number(settings['metadata.matchThreshold'])||.72
+    defaultMatchMode.value = settings['metadata.defaultMatchMode']||'MANUAL'
   } catch {}
   restoreDraft()
   startTaskRefresh()
