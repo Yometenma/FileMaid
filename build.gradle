@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'net.filemaid'
-version = '0.1.3'
+version = '1.0.0'
 
 allprojects {
     group = rootProject.group
