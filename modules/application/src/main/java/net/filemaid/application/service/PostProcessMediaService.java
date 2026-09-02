@@ -29,6 +29,9 @@ public final class PostProcessMediaService {
         this.roots=roots.stream().collect(Collectors.toUnmodifiableMap(StorageRoot::id, Function.identity())); this.pathPolicy=pathPolicy; this.processor=processor; this.history=history; this.settings=settings;
     }
     public List<OperationResult> process(String rootId, List<Item> items, boolean nfo, boolean artwork, String artworkType) {
+        return process(rootId, items, nfo, artwork, artworkType, null);
+    }
+    public List<OperationResult> process(String rootId, List<Item> items, boolean nfo, boolean artwork, String artworkType, String batchId) {
         StorageRoot root=roots.get(rootId); if(root==null)throw new IllegalArgumentException("Unknown storage root: "+rootId); if(!root.writable())throw new IllegalStateException("Storage root is read-only: "+rootId);
         List<OperationResult> results=new ArrayList<>();
         for(Item item:items){Path media=pathPolicy.resolve(root,item.mediaPath());if(!Files.isRegularFile(media)){results.add(new OperationResult(item.mediaPath(),item.mediaPath(),RenameOperation.OperationType.NFO,false,"媒体文件不存在"));continue;}
@@ -41,7 +44,7 @@ public final class PostProcessMediaService {
                 else{results.add(run(item.mediaPath(),RenameOperation.OperationType.ARTWORK,()->processor.downloadArtwork(media,item.artworkUrl(),"POSTER"),root));}
             }
         }
-        if(!results.isEmpty())history.append(results); cleanupHistory(); return results;
+        if(!results.isEmpty()){if(batchId==null||batchId.isBlank())history.append(results);else history.append(batchId,results);} cleanupHistory(); return results;
     }
     private void cleanupHistory() {
         int days = settings == null ? 0 : OperationHistoryService.parseDays(settings.value("files.historyRetentionDays", "90"));

@@ -10,6 +10,8 @@ import net.filemaid.core.model.OperationResult;
 public interface OperationHistoryRepository {
     List<OperationRecord> append(List<OperationResult> results);
 
+    default List<OperationRecord> append(String batchId, List<OperationResult> results) { return append(results); }
+
     List<OperationRecord> findAll();
 
     Optional<OperationRecord> findById(long id);

@@ -50,6 +50,18 @@ public final class BackupService {
         } catch (IOException failure) { throw new IllegalStateException("无法读取备份目录", failure); }
     }
 
+    public Path backupFile(String name) {
+        if (name == null || !name.matches("filemaid-\\d{8}-\\d{6}\\.db")) {
+            throw new IllegalArgumentException("备份文件名无效");
+        }
+        Path directory = backupsDirectory();
+        Path file = directory.resolve(name).normalize();
+        if (!file.getParent().equals(directory) || !Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("备份文件不存在");
+        }
+        return file;
+    }
+
     private BackupEntry toEntry(Path path) {
         try {
             long size = Files.size(path);

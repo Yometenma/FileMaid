@@ -46,6 +46,10 @@ public final class ExecuteRenamePlanService {
     }
 
     public List<OperationResult> execute(String rootId, List<RenameOperation> operations) {
+        return execute(rootId, operations, null);
+    }
+
+    public List<OperationResult> execute(String rootId, List<RenameOperation> operations, String batchId) {
         StorageRoot root = roots.get(rootId);
         if (root == null) throw new IllegalArgumentException("Unknown storage root: " + rootId);
         if (!root.writable()) throw new IllegalStateException("Storage root is read-only: " + rootId);
@@ -61,7 +65,9 @@ public final class ExecuteRenamePlanService {
             }
         }
         cleanupEmptyDirectories(root, emptiedParents);
-        if (history != null && !results.isEmpty()) history.append(results);
+        if (history != null && !results.isEmpty()) {
+            if (batchId == null || batchId.isBlank()) history.append(results); else history.append(batchId, results);
+        }
         cleanupHistory();
         return results;
     }

@@ -21,4 +21,6 @@ public final class TaskContext {
     public boolean isCancelled() {
         return cancelled.get();
     }
+
+    public String taskId() { return taskId; }
 }

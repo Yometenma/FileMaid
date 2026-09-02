@@ -41,19 +41,30 @@ const runningTasks = ref<Task[]>([])
 type Candidate = { provider:string;id:string;type:string;title:string;year?:number;overview?:string;artworkUrl?:string;fanartUrl?:string }
 const metadataDrawer = ref(false), metadataLoading = ref(false), metadataQuery = ref(''), metadataType = ref('SERIES')
 const metadataCandidates = ref<Candidate[]>([]), activeSource = ref(''), selections = ref<Record<string,any>>({})
-type HistoryItem = { id:number;source:string;target:string;type:string;success:boolean;error?:string;timestamp:string }
+type HistoryItem = { id:number;batchId?:string;source:string;target:string;type:string;success:boolean;error?:string;timestamp:string }
 const history = ref<HistoryItem[]>([]), historyLoading = ref(false), historyQuery = ref('')
 const generateNfo=ref(false),downloadArtwork=ref(false),artworkType=ref('POSTER'),artworkUrls=ref<Record<string,string>>({}),fanartUrls=ref<Record<string,string>>({})
 const candidateLimit=ref(10),matchThreshold=ref(.72)
 const filteredHistory = computed(() => history.value.filter(item => !historyQuery.value || `${item.source} ${item.target}`.toLowerCase().includes(historyQuery.value.toLowerCase())))
 const historyGroups = computed(() => {
   const groups: { key: string; time: string; items: HistoryItem[] }[] = []
+  const batches = new Map<string, { key: string; time: string; items: HistoryItem[] }>()
   for (const item of filteredHistory.value) {
+    if (item.batchId) {
+      const existing = batches.get(item.batchId)
+      if (existing) existing.items.push(item)
+      else {
+        const group = { key: item.batchId, time: item.timestamp, items: [item] }
+        batches.set(item.batchId, group)
+        groups.push(group)
+      }
+      continue
+    }
     const last = groups[groups.length - 1]
-    if (last && Math.abs(new Date(last.time).getTime() - new Date(item.timestamp).getTime()) < 5000) {
+    if (last && !batches.has(last.key) && Math.abs(new Date(last.time).getTime() - new Date(item.timestamp).getTime()) < 5000) {
       last.items.push(item)
     } else {
-      groups.push({ key: `${item.timestamp}-${item.id}`, time: item.timestamp, items: [item] })
+      groups.push({ key: `legacy-${item.timestamp}-${item.id}`, time: item.timestamp, items: [item] })
     }
   }
   return groups

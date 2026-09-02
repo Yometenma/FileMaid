@@ -35,6 +35,7 @@ public final class SqliteOperationHistoryRepository implements OperationHistoryR
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS operation_history (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        batch_id TEXT,
                         source TEXT NOT NULL,
                         target TEXT NOT NULL,
                         type TEXT NOT NULL,
@@ -43,6 +44,12 @@ public final class SqliteOperationHistoryRepository implements OperationHistoryR
                         timestamp TEXT NOT NULL
                     )
                     """);
+            try {
+                statement.execute("ALTER TABLE operation_history ADD COLUMN batch_id TEXT");
+            } catch (java.sql.SQLException failure) {
+                String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(java.util.Locale.ROOT);
+                if (!message.contains("duplicate column")) throw failure;
+            }
         } catch (Exception failure) {
             throw new IllegalStateException("Failed to initialize operation history schema", failure);
         }
@@ -54,23 +61,29 @@ public final class SqliteOperationHistoryRepository implements OperationHistoryR
 
     @Override
     public List<OperationRecord> append(List<OperationResult> results) {
+        return append(java.util.UUID.randomUUID().toString(), results);
+    }
+
+    @Override
+    public List<OperationRecord> append(String batchId, List<OperationResult> results) {
         if (results == null || results.isEmpty()) return List.of();
-        String sql = "INSERT INTO operation_history (source, target, type, success, error, timestamp) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO operation_history (batch_id, source, target, type, success, error, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)";
         Instant timestamp = Instant.now();
         List<OperationRecord> records = new ArrayList<>();
         try (Connection connection = connection()) {
             for (OperationResult result : results) {
                 try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-                    statement.setString(1, result.source());
-                    statement.setString(2, result.target());
-                    statement.setString(3, result.type().name());
-                    statement.setInt(4, result.success() ? 1 : 0);
-                    statement.setString(5, result.error());
-                    statement.setString(6, timestamp.toString());
+                    statement.setString(1, batchId);
+                    statement.setString(2, result.source());
+                    statement.setString(3, result.target());
+                    statement.setString(4, result.type().name());
+                    statement.setInt(5, result.success() ? 1 : 0);
+                    statement.setString(6, result.error());
+                    statement.setString(7, timestamp.toString());
                     statement.executeUpdate();
                     try (ResultSet keys = statement.getGeneratedKeys()) {
                         if (keys.next()) {
-                            records.add(new OperationRecord(keys.getLong(1), result.source(), result.target(),
+                            records.add(new OperationRecord(keys.getLong(1), batchId, result.source(), result.target(),
                                     result.type(), result.success(), result.error(), timestamp));
                         }
                     }
@@ -84,7 +97,7 @@ public final class SqliteOperationHistoryRepository implements OperationHistoryR
 
     @Override
     public List<OperationRecord> findAll() {
-        String sql = "SELECT id, source, target, type, success, error, timestamp FROM operation_history ORDER BY id DESC";
+        String sql = "SELECT id, batch_id, source, target, type, success, error, timestamp FROM operation_history ORDER BY id DESC";
         List<OperationRecord> records = new ArrayList<>();
         try (Connection connection = connection(); Statement statement = connection.createStatement();
              ResultSet resultSet = statement.executeQuery(sql)) {
@@ -97,7 +110,7 @@ public final class SqliteOperationHistoryRepository implements OperationHistoryR
 
     @Override
     public Optional<OperationRecord> findById(long id) {
-        String sql = "SELECT id, source, target, type, success, error, timestamp FROM operation_history WHERE id = ?";
+        String sql = "SELECT id, batch_id, source, target, type, success, error, timestamp FROM operation_history WHERE id = ?";
         try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setLong(1, id);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -123,6 +136,7 @@ public final class SqliteOperationHistoryRepository implements OperationHistoryR
     private OperationRecord map(ResultSet resultSet) throws Exception {
         return new OperationRecord(
                 resultSet.getLong("id"),
+                resultSet.getString("batch_id"),
                 resultSet.getString("source"),
                 resultSet.getString("target"),
                 RenameOperation.OperationType.valueOf(resultSet.getString("type")),

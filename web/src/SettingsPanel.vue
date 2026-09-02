@@ -46,6 +46,7 @@ async function testProvider(id:string){testingProvider.value=id;try{providerTest
 async function loadDiagnostics(){diagnosing.value=true;try{diagnostics.value=await api('/api/v1/system/diagnostics')}catch(error){notice.value=error instanceof Error?error.message:'诊断失败'}finally{diagnosing.value=false}}
 async function createBackup(){backingUp.value=true;try{await api('/api/v1/system/backup',{method:'POST'});await loadBackups();ElMessage.success('备份完成')}catch(error){ElMessage.error(error instanceof Error?error.message:'备份失败')}finally{backingUp.value=false}}
 async function loadBackups(){try{backups.value=await api('/api/v1/system/backups')}catch{backups.value=[]}}
+function downloadBackup(file:string){window.location.assign(`/api/v1/system/backups/${encodeURIComponent(file)}`)}
 async function testNotification(){testingNotification.value=true;notificationResult.value='';try{const result=await api<{success:boolean;status:number;error?:string}>('/api/v1/system/test-notification',{method:'POST'});notificationResult.value=result.success?`发送成功（HTTP ${result.status}）`:(result.error||'发送失败')}catch(error){notificationResult.value=error instanceof Error?error.message:'发送失败'}finally{testingNotification.value=false}}
 onMounted(load)
 </script>
@@ -81,7 +82,7 @@ onMounted(load)
       </div>
       <div v-if="activeCategory==='system'" class="backup-panel">
         <div class="backup-actions"><el-button size="small" type="primary" :loading="backingUp" @click="createBackup">立即备份数据库</el-button><span v-if="backups.length" class="backup-count">共 {{ backups.length }} 份备份</span></div>
-        <ul v-if="backups.length" class="backup-list"><li v-for="b in backups" :key="b.file"><span>{{ b.file }}</span><small>{{ (b.size/1024).toFixed(1) }} KB · {{ new Date(b.time).toLocaleString() }}</small></li></ul>
+        <ul v-if="backups.length" class="backup-list"><li v-for="b in backups" :key="b.file"><span><strong>{{ b.file }}</strong><small>{{ (b.size/1024).toFixed(1) }} KB · {{ new Date(b.time).toLocaleString() }}</small></span><el-button size="small" @click="downloadBackup(b.file)">下载</el-button></li></ul>
       </div>
       <div v-if="activeCategory==='notification'" class="notification-test">
         <el-button :loading="testingNotification" @click="testNotification">发送测试通知</el-button>

@@ -101,7 +101,7 @@ public class MediaController {
     }
 
     private List<OperationResult> executeConfirmed(ConfirmedPlanRegistry.ConfirmedPlan plan, net.filemaid.server.TaskContext context) {
-        List<OperationResult> results = new ArrayList<>(executePlanService.execute(plan.rootId(), plan.operations()));
+        List<OperationResult> results = new ArrayList<>(executePlanService.execute(plan.rootId(), plan.operations(), context.taskId()));
         context.progress(70, "文件操作完成，执行后处理");
         PostProcessPlan postProcess = plan.postProcess();
         if (postProcess != null && postProcess.enabled()) {
@@ -113,7 +113,7 @@ public class MediaController {
                     .map(item -> new PostProcessMediaService.Item(targetBySource.get(item.source()), item.metadata(), item.artworkUrl(), item.fanartUrl()))
                     .toList();
             if (!items.isEmpty()) {
-                results.addAll(postProcessService.process(plan.rootId(), items, postProcess.generateNfo(), postProcess.downloadArtwork(), postProcess.artworkType()));
+                results.addAll(postProcessService.process(plan.rootId(), items, postProcess.generateNfo(), postProcess.downloadArtwork(), postProcess.artworkType(), context.taskId()));
             }
         }
         return results;

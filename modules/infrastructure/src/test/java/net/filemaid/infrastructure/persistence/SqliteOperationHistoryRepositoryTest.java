@@ -16,17 +16,19 @@ class SqliteOperationHistoryRepositoryTest {
     @Test
     void appendsAndFinds() {
         var repository = new SqliteOperationHistoryRepository(tempDir.resolve("test.db").toString());
-        var records = repository.append(List.of(
+        var records = repository.append("batch-1", List.of(
                 new OperationResult("a.mkv", "b.mkv", RenameOperation.OperationType.MOVE, true, null),
                 new OperationResult("c.mkv", "d.mkv", RenameOperation.OperationType.COPY, false, "boom")));
 
         assertEquals(2, records.size());
         assertTrue(records.get(0).id() > 0);
+        assertEquals("batch-1", records.get(0).batchId());
         assertEquals(2, repository.findAll().size());
 
         var found = repository.findById(records.get(0).id()).orElseThrow();
         assertEquals("a.mkv", found.source());
         assertEquals("b.mkv", found.target());
+        assertEquals("batch-1", found.batchId());
         assertTrue(found.success());
     }
 }

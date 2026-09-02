@@ -49,7 +49,9 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
     @Override public String status() { return delegate().status(); }
 
     @Override public List<MetadataCandidate> search(String query, MetadataType type, Locale locale, int limit) throws Exception {
-        String key = cacheKey(query, type, locale, limit);
+        String titlePreference = settings.value("naming.titlePreference", "LOCALIZED");
+        Locale requestedLocale = "ENGLISH".equals(titlePreference) ? Locale.ENGLISH : locale;
+        String key = cacheKey(query, type, requestedLocale, limit) + "|" + titlePreference;
         CacheEntry existing = cache.computeIfAbsent(key, ignored -> durableCache.find(key)
                 .map(entry -> new CacheEntry(entry.candidates(), entry.createdAt().toEpochMilli(), entry.ttlSeconds() * 1_000L)).orElse(null));
         long now = System.currentTimeMillis();
@@ -65,7 +67,8 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
                 for (int attempt = 0; attempt <= retries; attempt++) {
                     try {
                         consumeRequestBudget();
-                        List<MetadataCandidate> result = List.copyOf(delegate().search(query, type, locale, limit));
+                        List<MetadataCandidate> result = delegate().search(query, type, requestedLocale, limit).stream()
+                                .map(candidate -> applyTitlePreference(candidate, titlePreference)).toList();
                         if (cache.size() >= 1_000) cache.clear();
                         cache.put(key, new CacheEntry(result, now, result.isEmpty() ? EMPTY_TTL_MS : SUCCESS_TTL_MS));
                         durableCache.save(key, providerId, result, Instant.ofEpochMilli(now), (result.isEmpty() ? EMPTY_TTL_MS : SUCCESS_TTL_MS) / 1_000L);
@@ -103,6 +106,19 @@ public final class RuntimeMetadataProvider implements MetadataProvider {
     }
 
     private record CacheEntry(List<MetadataCandidate> value, long createdAt, long ttlMillis) { }
+
+    static MetadataCandidate applyTitlePreference(MetadataCandidate candidate, String preference) {
+        if (!"ORIGINAL".equals(preference) || !"tmdb".equals(candidate.provider()) || candidate.alternativeTitles().isEmpty()) {
+            return candidate;
+        }
+        String original = candidate.alternativeTitles().get(0);
+        if (original == null || original.isBlank() || original.equals(candidate.title())) return candidate;
+        List<String> alternatives = new java.util.ArrayList<>();
+        alternatives.add(candidate.title());
+        alternatives.addAll(candidate.alternativeTitles().subList(1, candidate.alternativeTitles().size()));
+        return new MetadataCandidate(candidate.provider(), candidate.id(), candidate.type(), original, alternatives,
+                candidate.year(), candidate.overview(), candidate.artworkUrl(), candidate.fanartUrl());
+    }
 
     private void consumeRequestBudget() {
         if (!"omdb".equals(providerId)) return;

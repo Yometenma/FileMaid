@@ -4,7 +4,7 @@
 
 **自托管的媒体文件整理工具**
 
-当前测试版本：**0.1.2** · [查看变更记录](CHANGELOG.md)
+当前测试版本：**0.1.3** · [查看变更记录](CHANGELOG.md)
 
 ![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)
