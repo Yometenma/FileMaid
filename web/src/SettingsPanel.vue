@@ -72,10 +72,12 @@ onMounted(load)
         <small>第三方图片的权利不等同于元数据 API 许可；下载和使用前请确认适用权利。</small>
       </div>
       <div v-if="activeCategory==='system'" class="diagnostics" v-loading="diagnosing">
-        <div><span :class="diagnostics?.databaseWritable?'healthy':'failed'"></span><strong>SQLite 数据库</strong><small>{{ diagnostics?.databaseWritable?'可写':'不可写' }}</small></div>
-        <div><span :class="diagnostics?.ffprobeAvailable?'healthy':'failed'"></span><strong>FFprobe</strong><small>{{ diagnostics?.ffprobeAvailable?'可用':'不可用' }}</small></div>
-        <div v-for="root in diagnostics?.roots||[]" :key="root.id"><span :class="root.healthy?'healthy':'failed'"></span><strong>{{ root.id }}</strong><small>{{ root.detail }}</small></div>
-        <el-button size="small" @click="loadDiagnostics">重新检查</el-button>
+        <div class="diagnostics-header"><strong>运行状态</strong><el-button size="small" @click="loadDiagnostics">重新检查</el-button></div>
+        <div class="diagnostics-grid">
+          <div><span :class="diagnostics?.databaseWritable?'healthy':'failed'"></span><strong>SQLite 数据库</strong><small>{{ diagnostics?.databaseWritable?'可写':'不可写' }}</small></div>
+          <div><span :class="diagnostics?.ffprobeAvailable?'healthy':'failed'"></span><strong>FFprobe</strong><small>{{ diagnostics?.ffprobeAvailable?'可用':'不可用' }}</small></div>
+          <div v-for="root in diagnostics?.roots||[]" :key="root.id"><span :class="root.healthy?'healthy':'failed'"></span><strong>{{ root.id }}</strong><small>{{ root.detail }}</small></div>
+        </div>
       </div>
       <div v-if="activeCategory==='system'" class="backup-panel">
         <div class="backup-actions"><el-button size="small" type="primary" :loading="backingUp" @click="createBackup">立即备份数据库</el-button><span v-if="backups.length" class="backup-count">共 {{ backups.length }} 份备份</span></div>
