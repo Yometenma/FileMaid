@@ -27,6 +27,6 @@ jobs:
         working-directory: web
         run: npm ci && npm test && npm run build
       - name: Test backend
-        run: ./gradlew test --no-daemon
+        run: chmod +x gradlew && ./gradlew test --no-daemon
       - name: Build container
         run: docker build -t filemaid-ci .
