@@ -14,6 +14,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import net.filemaid.application.port.TaskRepository;
 import net.filemaid.core.model.Task;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Submits work to a small worker pool and tracks each task's status, progress,
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class BackgroundTaskService {
+    private static final Logger log = LoggerFactory.getLogger(BackgroundTaskService.class);
     private final TaskRepository repository;
     private final NotificationService notifications;
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
@@ -42,6 +45,7 @@ public class BackgroundTaskService {
         cancellations.put(id, cancelled);
         Future<?> future = executor.submit(() -> run(id, work, cancelled));
         futures.put(id, future);
+        log.info("任务已提交：type={}, id={}", type, id);
         return id;
     }
 
@@ -59,6 +63,7 @@ public class BackgroundTaskService {
         cancelled.set(true);
         Future<?> future = futures.get(id);
         if (future != null) future.cancel(true);
+        log.info("任务取消已请求：id={}", id);
         return true;
     }
 
@@ -72,14 +77,18 @@ public class BackgroundTaskService {
             Object result = work.run(new TaskContext(this, id, cancelled));
             if (cancelled.get()) {
                 update(id, Task.Status.CANCELLED, 100, "已取消", null, null);
+                log.info("任务已取消：id={}", id);
             } else {
                 update(id, Task.Status.COMPLETED, 100, "完成", result, null);
+                log.info("任务完成：id={}", id);
             }
         } catch (Exception failure) {
             if (cancelled.get()) {
                 update(id, Task.Status.CANCELLED, 100, "已取消", null, null);
+                log.info("任务已取消：id={}", id);
             } else {
                 update(id, Task.Status.FAILED, 100, "失败", null, failure.getMessage());
+                log.error("任务失败：id={}, reason={}", id, failure.getMessage());
             }
         } finally {
             repository.findById(id).filter(task -> "EXECUTE".equals(task.type())).ifPresent(notifications::sendTaskCompletion);

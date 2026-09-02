@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,7 +34,6 @@ import org.springframework.http.MediaType;
 class FileMaidServerTest {
     @Autowired ApplicationContext context;
     @Autowired MockMvc mvc;
-    @Autowired BackupService backupService;
     @Autowired ObjectMapper objectMapper;
     private final Path mediaDirectory = Path.of("build/test-media").toAbsolutePath();
 
@@ -57,17 +55,12 @@ class FileMaidServerTest {
     }
 
     @Test
-    void downloadsOnlyKnownDatabaseBackups() throws Exception {
-        String name = backupService.createBackup();
-        try {
-            mvc.perform(get("/api/v1/system/backups/{name}", name))
-                    .andExpect(status().isOk())
-                    .andExpect(header().string("Content-Disposition", "attachment; filename=\"" + name + "\""));
-            mvc.perform(get("/api/v1/system/backups/{name}", "../filemaid.db"))
-                    .andExpect(status().is4xxClientError());
-        } finally {
-            Files.deleteIfExists(backupService.backupFile(name));
-        }
+    void exposesSanitizedApplicationLogs() throws Exception {
+        org.slf4j.LoggerFactory.getLogger("net.filemaid.test.WebLog").warn("web-log-redaction api_key=should-not-leak completed");
+        mvc.perform(get("/api/v1/logs").param("query", "web-log-redaction").param("level", "WARN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].logger").value("WebLog"))
+                .andExpect(jsonPath("$[0].message").value("web-log-redaction api_key=*** completed"));
     }
 
     @Test

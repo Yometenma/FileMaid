@@ -83,8 +83,10 @@ public class MediaController {
         }
         String taskId = taskService.submit("PREVIEW", "正在探测媒体并生成预览", context -> {
             context.checkCancelled();
-            context.progress(10, "正在探测媒体信息");
-            List<RenamePreview> result = previewService.preview(request.rootId(), request.paths(), request.selections());
+            context.progress(5, "正在探测媒体信息");
+            List<RenamePreview> result = previewService.preview(request.rootId(), request.paths(), request.selections(),
+                    percent -> context.progress(5 + percent * 90 / 100,
+                            "正在生成预览（" + percent + "%）"), context::isCancelled);
             context.checkCancelled();
             context.progress(95, "预览生成完成");
             return result;

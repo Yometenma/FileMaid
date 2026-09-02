@@ -95,7 +95,6 @@ public final class SettingsService {
         add(map, "provider.tvdb.pin", "providers", Type.STRING, "", true, false, 0, 0);
         add(map, "provider.omdb.apiKey", "providers", Type.STRING, "", true, false, 0, 0);
         add(map, "provider.omdb.dailyLimit", "providers", Type.INTEGER, "1000", false, false, 0, 1_000_000);
-        add(map, "provider.anidb.clientName", "providers", Type.STRING, "filemaid", false, false, 0, 0);
         add(map, "naming.preset", "naming", Type.ENUM, "JELLYFIN", false, false, 0, 0, "JELLYFIN", "EMBY", "PLEX", "CUSTOM");
         add(map, "naming.seriesTemplate", "naming", Type.TEMPLATE, "TV Shows/{title}/Season {season:02}/{title} - S{season:02}{episodes}{extension}", false, false, 0, 0);
         add(map, "naming.movieTemplate", "naming", Type.TEMPLATE, "Movies/{title} ({year})/{title} ({year}){extension}", false, false, 0, 0);
@@ -120,7 +119,6 @@ public final class SettingsService {
         add(map, "scan.extensions", "scan", Type.STRING, "mkv,mp4,avi,mov,m4v,ts,m2ts,ass,srt,ssa,vtt,nfo,jpg,jpeg,png", false, false, 0, 0);
         add(map, "system.timezone", "system", Type.TIMEZONE, "Asia/Shanghai", false, false, 0, 0);
         add(map, "system.logLevel", "system", Type.ENUM, "INFO", false, false, 0, 0, "ERROR", "WARN", "INFO", "DEBUG");
-        add(map, "system.databaseBackupRetention", "system", Type.INTEGER, "7", false, false, 1, 365);
         add(map, "notification.webhookUrl", "notification", Type.URI, "", false, false, 0, 0);
         Set<String> runtimeKeys = Set.of(
                 "network.proxyType", "network.proxyHost", "network.proxyPort", "network.proxyUsername", "network.proxyPassword",
@@ -133,7 +131,7 @@ public final class SettingsService {
                 "metadata.matchThreshold", "metadata.candidateLimit", "postprocess.generateNfo", "postprocess.downloadArtwork", "postprocess.artworkType", "files.defaultOperation",
                 "naming.preset", "naming.titlePreference", "naming.unknownTitle", "scan.ignorePatterns", "scan.minimumFileSizeMb", "scan.extensions",
                 "files.conflictPolicy", "files.historyRetentionDays", "postprocess.cleanEmptyDirectories", "notification.webhookUrl",
-                "metadata.defaultMatchMode", "system.databaseBackupRetention"));
+                "metadata.defaultMatchMode"));
         runtimeKeys.addAll(Set.of("system.timezone", "system.logLevel"));
         runtimeKeys.forEach(key -> map.computeIfPresent(key, (ignored, value) -> new Definition(value.key(), value.category(), value.type(), value.defaultValue(), value.secret(), true, value.min(), value.max(), value.options())));
         return java.util.Collections.unmodifiableMap(map);

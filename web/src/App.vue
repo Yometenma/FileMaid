@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api, type MediaFile, type Preview, type Root } from './api'
-import { Clock, Files, FolderOpened, Moon, MoreFilled, Operation, Refresh, Search, Setting, Sunny, Warning } from '@element-plus/icons-vue'
+import { Clock, Document, Files, FolderOpened, Moon, MoreFilled, Operation, Refresh, Search, Setting, Sunny, Warning } from '@element-plus/icons-vue'
 import SettingsPanel from './SettingsPanel.vue'
 import DirectoryBrowser from './DirectoryBrowser.vue'
 
-type Page = 'organize' | 'history' | 'settings'
+type Page = 'organize' | 'history' | 'logs' | 'settings'
 type Theme = 'system' | 'light' | 'dark'
 function pageFromHash(): Page {
   const h = window.location.hash.replace(/^#\/?/, '')
-  return h === 'history' ? 'history' : h === 'settings' ? 'settings' : 'organize'
+  return h === 'history' ? 'history' : h === 'logs' ? 'logs' : h === 'settings' ? 'settings' : 'organize'
 }
 function navigate(p: Page) {
   if (page.value !== p) page.value = p
@@ -45,6 +45,10 @@ type HistoryItem = { id:number;batchId?:string;source:string;target:string;type:
 const history = ref<HistoryItem[]>([]), historyLoading = ref(false), historyQuery = ref(''), historyStatus = ref('ALL'), historyType = ref('ALL')
 const generateNfo=ref(false),downloadArtwork=ref(false),artworkType=ref('POSTER'),artworkUrls=ref<Record<string,string>>({}),fanartUrls=ref<Record<string,string>>({})
 const candidateLimit=ref(10),matchThreshold=ref(.72),defaultMatchMode=ref('MANUAL')
+type LogEntry = { id:number;timestamp:string;level:string;logger:string;message:string;thread:string }
+const logs=ref<LogEntry[]>([]), logLevel=ref('ALL'), logQuery=ref(''), logsPaused=ref(false), logsLoading=ref(false)
+const logView=ref<HTMLElement|null>(null)
+let lastLogId=0, logTimer:number|undefined
 const filteredHistory = computed(() => history.value.filter(item => {
   const matchesQuery = !historyQuery.value || `${item.source} ${item.target}`.toLowerCase().includes(historyQuery.value.toLowerCase())
   const matchesStatus = historyStatus.value === 'ALL' || (historyStatus.value === 'SUCCESS' ? item.success : !item.success)
@@ -135,6 +139,19 @@ function startTaskRefresh() {
 function stopTaskRefresh() {
   if (taskRefreshTimer) { clearInterval(taskRefreshTimer); taskRefreshTimer = undefined }
 }
+
+async function loadLogs(reset=false) {
+  if (logsPaused.value && !reset) return
+  if (reset) { logs.value=[]; lastLogId=0 }
+  logsLoading.value=true
+  try {
+    const rows=await api<LogEntry[]>(`/api/v1/logs?after=${lastLogId}&level=${logLevel.value}&query=${encodeURIComponent(logQuery.value)}&limit=500`)
+    if(rows.length){logs.value.push(...rows);lastLogId=Math.max(lastLogId,...rows.map(row=>row.id));if(logs.value.length>1000)logs.value.splice(0,logs.value.length-1000);await nextTick();if(logView.value)logView.value.scrollTop=logView.value.scrollHeight}
+  } catch {} finally { logsLoading.value=false }
+}
+function startLogRefresh(){if(logTimer)clearInterval(logTimer);loadLogs(true);logTimer=window.setInterval(()=>loadLogs(),2000)}
+function stopLogRefresh(){if(logTimer){clearInterval(logTimer);logTimer=undefined}}
+function clearLogView(){logs.value=[]}
 
 async function scan() {
   if (!rootId.value) return
@@ -332,8 +349,9 @@ onMounted(async() => {
   restoreDraft()
   startTaskRefresh()
 })
-onUnmounted(stopTaskRefresh)
-watch(page,value=>{if(value==='history')loadHistory()})
+onUnmounted(()=>{stopTaskRefresh();stopLogRefresh()})
+watch(page,value=>{if(value==='history')loadHistory();if(value==='logs')startLogRefresh();else stopLogRefresh()})
+watch([logLevel,logQuery],()=>{if(page.value==='logs')loadLogs(true)})
 </script>
 
 <template>
@@ -345,6 +363,7 @@ watch(page,value=>{if(value==='history')loadHistory()})
       <nav class="main-nav" aria-label="主导航">
         <button :class="{ active: page === 'organize' }" @click="navigate('organize')"><Operation />整理</button>
         <button :class="{ active: page === 'history' }" @click="navigate('history')"><Clock />历史</button>
+        <button :class="{ active: page === 'logs' }" @click="navigate('logs')"><Document />日志</button>
         <button :class="{ active: page === 'settings' }" @click="navigate('settings')"><Setting />设置</button>
       </nav>
       <div class="top-actions">
@@ -467,6 +486,17 @@ watch(page,value=>{if(value==='history')loadHistory()})
               </div>
             </el-collapse-item>
           </el-collapse>
+        </div>
+      </section>
+    </main>
+
+    <main v-else-if="page === 'logs'" class="page secondary-page">
+      <section class="page-heading"><div><p class="eyebrow">运行记录</p><h1>实时日志</h1><p>查看扫描、匹配、整理和系统运行信息。</p></div><div class="heading-state"><span>{{ logsPaused?'已暂停':'自动刷新' }}</span><strong>{{ logs.length }} 条</strong></div></section>
+      <section class="log-card surface">
+        <div class="table-toolbar"><div><h2>服务日志</h2><span>内存最多保留 2000 条，页面显示最近 1000 条</span></div><div class="history-filters"><el-select v-model="logLevel" style="width:120px"><el-option label="全部级别" value="ALL"/><el-option label="信息" value="INFO"/><el-option label="警告" value="WARN"/><el-option label="错误" value="ERROR"/></el-select><el-input v-model="logQuery" clearable placeholder="搜索日志" style="width:220px"><template #prefix><Search/></template></el-input><el-button @click="logsPaused=!logsPaused">{{ logsPaused?'继续':'暂停' }}</el-button><el-button @click="clearLogView">清空视图</el-button></div></div>
+        <div ref="logView" class="log-view" v-loading="logsLoading&&!logs.length">
+          <div v-if="!logs.length" class="directory-empty">暂无符合条件的日志</div>
+          <div v-for="entry in logs" :key="entry.id" class="log-line"><time>{{ new Date(entry.timestamp).toLocaleTimeString() }}</time><span class="log-level" :class="entry.level.toLowerCase()">{{ entry.level }}</span><span class="log-logger">{{ entry.logger }}</span><code>{{ entry.message }}</code></div>
         </div>
       </section>
     </main>

@@ -40,6 +40,6 @@ environment:
   FILEMAID_SECURE_COOKIES: "true"
 ```
 
-首次访问会进入管理员账号设置。FileMaid 只支持一个本地管理员账号；不要与其他服务共用密码。`/config/filemaid.db` 包含账号哈希、API 密钥、设置和操作历史，应限制宿主机文件权限并定期备份。
+首次访问会进入管理员账号设置。FileMaid 只支持一个本地管理员账号；不要与其他服务共用密码。`/config/filemaid.db` 包含账号哈希、API 密钥、设置和操作历史，应限制宿主机文件权限。
 
 建议仅信任由你控制的反向代理，不要接受来自公网客户端自行提供的 `X-Forwarded-*` 请求头。

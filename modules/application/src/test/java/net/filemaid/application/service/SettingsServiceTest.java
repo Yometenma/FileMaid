@@ -16,7 +16,7 @@ class SettingsServiceTest {
             @Override public void saveAll(Map<String, String> updates) { values.putAll(updates); }
         });
 
-        for (String key : new String[] { "metadata.defaultMatchMode", "system.databaseBackupRetention" }) {
+        for (String key : new String[] { "metadata.defaultMatchMode" }) {
             assertTrue(service.definitions().stream()
                     .filter(definition -> definition.key().equals(key))
                     .findFirst().orElseThrow().active(), key + " should be marked active");

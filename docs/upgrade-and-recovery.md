@@ -1,8 +1,8 @@
-# 升级、备份与恢复
+# 升级与恢复
 
 ## 升级容器
 
-FileMaid 的配置、管理员账号、历史和缓存都位于 `/config/filemaid.db`。升级前先在设置页创建数据库备份，并保留宿主机的 `config/` 目录。
+FileMaid 的配置、管理员账号、历史和缓存都位于 `/config/filemaid.db`。升级容器时保留宿主机的 `config/` 目录即可。
 
 ```bash
 docker compose pull
@@ -12,21 +12,9 @@ docker compose ps
 
 固定版本时，在 `.env` 写入明确版本号（例如 `FILEMAID_VERSION=0.1.3`）；确认新版本正常后再更新该值。不要删除或重新创建 `config/`。
 
-## 恢复数据库
-
-为避免运行中的 SQLite 连接覆盖恢复内容，恢复必须在容器停止时进行：
-
-```bash
-docker compose down
-cp config/backups/filemaid-YYYYMMDD-HHMMSS.db config/filemaid.db
-docker compose up -d
-```
-
-恢复前建议再复制一份当前 `config/filemaid.db`。备份目录与数据库位于同一个宿主机 `config/` 挂载中，不会进入镜像或 Git 仓库。
-
 ## 忘记管理员密码
 
-当前版本不提供绕过登录的在线重置接口，避免任何能远程接管管理员账号的后门。恢复方式是停止服务，恢复到仍记得密码的数据库备份；若没有可用备份，只能移走数据库并重新首次设置，这会同时失去设置和历史记录。
+当前版本不提供绕过登录的在线重置接口，避免任何能远程接管管理员账号的后门。若确实忘记密码，只能先停止服务，把 `config/filemaid.db` 移出原位置，再启动并重新进行首次设置。这会同时清除原有设置和历史记录；确认新实例正常前不要删除移出的数据库文件。
 
 ## API 密钥
 

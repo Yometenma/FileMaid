@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 import net.filemaid.application.port.MediaNameParser;
 import net.filemaid.application.port.NamingTemplateEngine;
@@ -37,12 +39,23 @@ public final class RenamePreviewService {
 
     /** When {@code rootId} is provided, media info is probed for video files and passed to the naming template. */
     public List<RenamePreview> preview(String rootId, List<String> relativePaths, List<MetadataSelection> selections) {
+        return preview(rootId, relativePaths, selections, ignored -> { }, () -> false);
+    }
+
+    public List<RenamePreview> preview(String rootId, List<String> relativePaths, List<MetadataSelection> selections,
+            IntConsumer progress, BooleanSupplier cancelled) {
         if (relativePaths == null || relativePaths.isEmpty()) throw new IllegalArgumentException("At least one relative path is required");
         if (relativePaths.size() > 1_000) throw new IllegalArgumentException("A preview may contain at most 1000 paths");
         List<MetadataSelection> safeSelections = selections == null ? List.of() : List.copyOf(selections);
-        List<RenamePreview> previews = relativePaths.stream()
-                .map(path -> previewOne(rootId, path, selectionFor(path, safeSelections)))
-                .toList();
+        List<RenamePreview> previews = new ArrayList<>(relativePaths.size());
+        for (int index = 0; index < relativePaths.size(); index++) {
+            if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) {
+                throw new java.util.concurrent.CancellationException("预览任务已取消");
+            }
+            String path = relativePaths.get(index);
+            previews.add(previewOne(rootId, path, selectionFor(path, safeSelections)));
+            progress.accept((index + 1) * 100 / relativePaths.size());
+        }
         return markTargetConflicts(previews);
     }
 
