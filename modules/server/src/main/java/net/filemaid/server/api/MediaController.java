@@ -76,6 +76,22 @@ public class MediaController {
         return previewService.preview(request.rootId(), request.paths(), request.selections());
     }
 
+    @PostMapping("/rename-plans/preview-task")
+    PreviewTaskResponse previewTask(@Valid @RequestBody PreviewRequest request) {
+        if (request.rootId() == null || request.rootId().isBlank()) {
+            throw new IllegalArgumentException("预览任务必须指定存储根目录");
+        }
+        String taskId = taskService.submit("PREVIEW", "正在探测媒体并生成预览", context -> {
+            context.checkCancelled();
+            context.progress(10, "正在探测媒体信息");
+            List<RenamePreview> result = previewService.preview(request.rootId(), request.paths(), request.selections());
+            context.checkCancelled();
+            context.progress(95, "预览生成完成");
+            return result;
+        });
+        return new PreviewTaskResponse(taskId);
+    }
+
     @PostMapping("/rename-plans")
     RenamePlan buildPlan(@Valid @RequestBody PlanRequest request) {
         RenameOperation.OperationType type = request.type() == null ? RenameOperation.OperationType.MOVE : request.type();
@@ -127,6 +143,7 @@ public class MediaController {
         public ExecuteRequest { if (confirmationToken == null) throw new IllegalArgumentException("缺少确认令牌"); }
     }
     public record ExecuteTaskResponse(String taskId) { }
+    public record PreviewTaskResponse(String taskId) { }
     public record ConfirmedValidation(boolean valid, List<String> problems, UUID confirmationToken) { }
     private void requireFileOperation(RenameOperation.OperationType type) {
         if (type == RenameOperation.OperationType.NFO || type == RenameOperation.OperationType.ARTWORK) throw new IllegalArgumentException("后处理操作不能进入文件整理计划");

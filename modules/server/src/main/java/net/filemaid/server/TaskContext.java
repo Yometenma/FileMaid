@@ -22,5 +22,9 @@ public final class TaskContext {
         return cancelled.get();
     }
 
+    public void checkCancelled() throws InterruptedException {
+        if (cancelled.get() || Thread.currentThread().isInterrupted()) throw new InterruptedException("任务已取消");
+    }
+
     public String taskId() { return taskId; }
 }

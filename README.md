@@ -121,6 +121,7 @@ API 根路径为 `/api/v1`。除健康检查、认证状态、首次设置和登
 | `POST /api/v1/media/parse` | 解析文件名（`{ "names": [...] }`） |
 | `POST /api/v1/media/groups/analyze` | 媒体分组 + 字幕/封面/NFO 关联分析 |
 | `POST /api/v1/rename-plans/preview` | 生成改名预览（可携带已选元数据；传 `rootId` 触发媒体探测并标记重名冲突） |
+| `POST /api/v1/rename-plans/preview-task` | 创建带 FFprobe 探测的后台预览任务，返回任务 ID（Web UI 默认使用） |
 | `POST /api/v1/rename-plans` | 生成执行计划（由源/目标/操作类型组成） |
 | `POST /api/v1/rename-plans/validate` | 校验计划并发放 15 分钟一次性确认令牌；同时固化可选后处理选项（NFO/封面） |
 | `POST /api/v1/rename-plans/execute` | 消费确认令牌，重新校验后执行（MOVE / COPY / HARDLINK + 可选后处理），逐文件返回结果 |

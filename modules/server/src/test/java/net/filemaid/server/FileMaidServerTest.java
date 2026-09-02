@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.http.MediaType;
 
 @SpringBootTest(properties = {
@@ -34,6 +36,7 @@ class FileMaidServerTest {
     @Autowired ApplicationContext context;
     @Autowired MockMvc mvc;
     @Autowired BackupService backupService;
+    @Autowired ObjectMapper objectMapper;
     private final Path mediaDirectory = Path.of("build/test-media").toAbsolutePath();
 
     @BeforeEach
@@ -125,6 +128,29 @@ class FileMaidServerTest {
                         .content("{\"paths\":[\"incoming/Example.Show.S01E02.1080p.mkv\"]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].target").value("TV Shows/Example Show/Season 01/Example Show - S01E02.mkv"));
+    }
+
+    @Test
+    void generatesRootAwarePreviewInBackground() throws Exception {
+        MvcResult submitted = mvc.perform(post("/api/v1/rename-plans/preview-task")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rootId\":\"media\",\"paths\":[\"Example.S01E01.mkv\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskId").isString())
+                .andReturn();
+        String taskId = objectMapper.readTree(submitted.getResponse().getContentAsString()).get("taskId").asText();
+
+        for (int attempt = 0; attempt < 100; attempt++) {
+            MvcResult task = mvc.perform(get("/api/v1/tasks/{id}", taskId)).andExpect(status().isOk()).andReturn();
+            var body = objectMapper.readTree(task.getResponse().getContentAsString());
+            if ("COMPLETED".equals(body.path("status").asText())) {
+                assertThat(body.path("result").get(0).path("source").asText()).isEqualTo("Example.S01E01.mkv");
+                return;
+            }
+            if ("FAILED".equals(body.path("status").asText())) throw new AssertionError(body.path("error").asText());
+            Thread.sleep(25);
+        }
+        throw new AssertionError("preview task did not complete");
     }
 
     @Test

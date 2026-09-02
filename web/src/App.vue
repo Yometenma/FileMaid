@@ -149,9 +149,7 @@ async function scan() {
     }
     companions.value = companionMap
     const videoPaths = files.filter(file => file.kind === 'VIDEO').map(file => file.path)
-    previews.value = videoPaths.length ? await api<Preview[]>('/api/v1/rename-plans/preview', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paths: videoPaths })
-    }) : []
+    previews.value = videoPaths.length ? await generatePreviews(videoPaths, []) : []
     message.value = `扫描完成，共生成 ${previews.value.length} 条整理预览`
     if (defaultMatchMode.value === 'AUTO' && previews.value.length) await autoMatch()
     persistDraft()
@@ -160,8 +158,15 @@ async function scan() {
 }
 
 async function refreshPreviews() {
-  previews.value=await api('/api/v1/rename-plans/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rootId:rootId.value,paths:previews.value.map(row=>row.source),selections:Object.values(selections.value)})})
+  previews.value=await generatePreviews(previews.value.map(row=>row.source),Object.values(selections.value))
   selected.value=[]; invalidatePlan()
+}
+async function generatePreviews(paths:string[], metadataSelections:any[]) {
+  const { taskId } = await api<{taskId:string}>('/api/v1/rename-plans/preview-task', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({rootId:rootId.value,paths,selections:metadataSelections})
+  })
+  return await pollTask(taskId) as Preview[]
 }
 async function openMatch(row:Preview) {
   activeSource.value=row.source; metadataQuery.value=row.media.title; metadataType.value=row.media.type==='MOVIE'?'MOVIE':'SERIES'; metadataDrawer.value=true
