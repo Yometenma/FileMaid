@@ -10,7 +10,7 @@ docker compose up -d
 docker compose ps
 ```
 
-固定版本时，在 `.env` 写入 `FILEMAID_VERSION=0.1.1`；确认新版本正常后再更新该值。不要删除或重新创建 `config/`。
+固定版本时，在 `.env` 写入明确版本号（例如 `FILEMAID_VERSION=0.1.3`）；确认新版本正常后再更新该值。不要删除或重新创建 `config/`。
 
 ## 恢复数据库
 
@@ -31,4 +31,3 @@ docker compose up -d
 ## API 密钥
 
 发布镜像不包含任何第三方 API 密钥。TMDB、TheTVDB 和 OMDb 密钥由部署者在设置页或私有 `.env` 中自行填写；`.env` 与 `config/` 都不应提交。TVMaze 与 AniDB 无需密钥。
-
