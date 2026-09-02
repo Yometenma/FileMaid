@@ -79,7 +79,7 @@ Start with a small set of disposable test files. Existing targets are not overwr
 Mount another directory with `/your/media/path:/media:ro`. Pin a release with:
 
 ```bash
-FILEMAID_VERSION=1.0.0 docker compose up -d
+FILEMAID_VERSION=1.0.1 docker compose up -d
 ```
 
 To update a pinned deployment, change the version and run `docker compose pull` followed by `docker compose up -d`.

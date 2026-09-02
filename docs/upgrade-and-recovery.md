@@ -10,7 +10,7 @@ docker compose up -d
 docker compose ps
 ```
 
-固定版本时，在 `.env` 写入明确版本号（例如 `FILEMAID_VERSION=1.0.0`）；确认新版本正常后再更新该值。不要删除或重新创建 `config/`。
+固定版本时，在 `.env` 写入明确版本号（例如 `FILEMAID_VERSION=1.0.1`）；确认新版本正常后再更新该值。不要删除或重新创建 `config/`。
 
 ## 忘记管理员密码
 

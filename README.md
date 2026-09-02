@@ -93,7 +93,7 @@ volumes:
 固定版本，避免自动跟随 `latest`：
 
 ```bash
-FILEMAID_VERSION=1.0.0 docker compose up -d
+FILEMAID_VERSION=1.0.1 docker compose up -d
 ```
 
 更新到新的固定版本时，修改版本号并运行：
