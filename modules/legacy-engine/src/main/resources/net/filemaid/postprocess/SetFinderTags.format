@@ -1,7 +1,0 @@
-FileBot
-{ movie; 'Movie' }
-{ episode; anime ? 'Anime' : 'TV Show' }
-{ movie; genre }
-{ movie; '★' * (rating / 2).round() }
-{ y }
-{ hd == 'UHD' && hdr ? 'HDR 4K' : null }

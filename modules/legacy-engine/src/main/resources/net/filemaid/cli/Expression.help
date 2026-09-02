@@ -1,8 +1,0 @@
-
-The following Groovy code is syntactically incorrect:
-%s
-
-The shell may interpret special characters such as ", ', `, $ or ! so special care must be taken when passing complex Groovy expressions on the command-line.
-
-Please pass complex Groovy expressions via external text files:
-https://www.filebot.net/help/argument-files.html
